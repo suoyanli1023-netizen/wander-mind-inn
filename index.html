@@ -781,48 +781,11 @@
 <!-- ============================================================ -->
 <!-- JavaScript -->
 <!-- ============================================================ -->
+<script src="js/state.js"></script>
+<script src="js/utils/xss.js"></script>
+<script src="js/utils/validation.js"></script>
+<script src="js/storage.js"></script>
 <script>
-// =============================================================
-// XSS 安全工具
-// =============================================================
-
-/**
- * 将用户输入安全地转义为 HTML 文本节点。
- * 仅用于将文本插入 HTML 文本节点位置（如 <p>${text}</p> 中的 text）。
- * 禁止用于：onclick/href/src/style/data 属性/HTML 标签名/CSS/JS 字符串。
- * 优先使用 createElement + textContent 代替此函数。
- */
-function escapeHtml(str) {
-  if (typeof str !== 'string') return '';
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-/**
- * Unicode 安全截断：按码点（而非 UTF-16 单元）截取字符串。
- * 避免 emoji 等多字节字符被从中间切断。
- */
-function truncateUnicode(str, maxLen) {
-  if (typeof str !== 'string') return '';
-  return Array.from(str.trim()).slice(0, maxLen).join('');
-}
-
-// =============================================================
-// 全局状态
-// =============================================================
-const STATE = {
-  archives: [],       // 情绪旅程存档
-  currentJourneyId: null,
-  houseState: { base: null, bg: null, mood: null, decos: [], diy: { skin: 'light', outfit: 'casual', acces: 'hat' } },
-  atmosphereState: { bg: null, base: null, furniture: [], characters: [], done: false },
-  drawState: { imageIdx: 0, q1: '', q2: '', q3: '', done: false },
-  worryState: { fragments: [] },
-  choiceState: { idx: 0, answers: [], saved: false, questions: [] },
-  currentPage: 'page-home',
-  originalTitle: ''
-};
-
 // 二选一题库（30+题，每次随机抽取10题；aw/bw 为情绪权重：-1=低沉/内敛，+1=明亮/外向）
 const CHOICE_QUESTION_POOL = [
   { q: '今天你想…', a: '安静地待在家里', b: '出去走走吹吹风', aw: -1, bw: 1 },
@@ -1252,17 +1215,6 @@ const DRAW_IMAGES = [
 // =============================================================
 // 初始化
 // =============================================================
-let _saveTimer = null;
-let _savePending = false;
-function saveToStorageDebounced() {
-  if (_saveTimer) clearTimeout(_saveTimer);
-  _savePending = true;
-  _saveTimer = setTimeout(() => {
-    _savePending = false;
-    saveToStorage();
-  }, 500);
-}
-
 let _visibilityGuard = false;
 let _exitModalTimer = null;
 
@@ -1788,34 +1740,6 @@ function detectMoodTags() {
   if (STATE.choiceState.answers.length > 0) tags.push('☁️ 自我觉察');
   if (tags.length === 0) tags.push('🌿 心灵漫游');
   return tags;
-}
-
-// =============================================================
-// 本地存储
-// =============================================================
-function saveToStorage() {
-  try {
-    localStorage.setItem('soul_journey', JSON.stringify({
-      archives: STATE.archives,
-      houseState: STATE.houseState,
-      drawState: STATE.drawState,
-      worryState: STATE.worryState,
-      choiceState: STATE.choiceState
-    }));
-  } catch(e) { /* storage full - ignore */ }
-}
-
-function loadFromStorage() {
-  try {
-    const data = JSON.parse(localStorage.getItem('soul_journey'));
-    if (data) {
-      STATE.archives = data.archives || [];
-      STATE.houseState = { ...STATE.houseState, ...(data.houseState || {}) };
-      STATE.drawState = { ...STATE.drawState, ...(data.drawState || {}) };
-      STATE.worryState = { ...STATE.worryState, ...(data.worryState || {}) };
-      STATE.choiceState = { ...STATE.choiceState, ...(data.choiceState || {}) };
-    }
-  } catch(e) {}
 }
 
 // =============================================================
