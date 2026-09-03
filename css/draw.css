@@ -1,0 +1,38 @@
+/* ========== 模块2: 绘画投射 ========== */
+.projection-img {
+  width: 100%;
+  max-width: 400px;
+  aspect-ratio: 1;
+  margin: 0 auto 16px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.projection-img svg { width: 90%; height: 90%; }
+
+.projection-q {
+  margin-bottom: 14px;
+}
+.projection-q-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.projection-q textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 14px;
+  border: 1px solid var(--primary-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-size: 13px;
+  color: var(--text);
+  resize: vertical;
+  transition: var(--transition);
+}
+.projection-q textarea:focus { border-color: var(--primary); background: #fff; }
+

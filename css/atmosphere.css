@@ -1,0 +1,433 @@
+
+/* ============================================================ */
+/* 氛围小屋 */
+/* ============================================================ */
+.atmosphere-workspace {
+  display: flex;
+  gap: 14px;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 16px;
+  min-height: calc(100vh - 160px);
+}
+.atmosphere-canvas-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.atmosphere-canvas {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #f5f0ec;
+  border-radius: var(--radius);
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--card-shadow);
+  border: 2px dashed #e0d8d4;
+  transform-origin: center center;
+  transition: transform 0.15s ease;
+}
+.atmosphere-canvas.has-bg {
+  border-style: solid;
+  border-color: transparent;
+}
+.atmosphere-canvas .layer {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none;
+  transition: opacity 0.8s ease, transform 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.atmosphere-canvas .layer-interactive {
+  /* 层容器本身不拦截事件，避免上层空白区域遮挡下层元素交互；
+     仅由内部 .furniture-item / .character-item 单独接收事件 */
+  pointer-events: none;
+}
+/* 背景层：全屏覆盖 */
+.atmosphere-canvas .layer-bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* 基底层：用 mix-blend-mode 让小屋与背景融合 */
+.atmosphere-canvas .layer-base {
+  mix-blend-mode: normal;
+}
+.atmosphere-canvas .layer-base img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  /* 自然融合：基底边缘与背景柔和过渡 */
+  mask-image: radial-gradient(ellipse 92% 92% at 50% 48%, #000 75%, rgba(0,0,0,0.5) 90%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 92% 92% at 50% 48%, #000 75%, rgba(0,0,0,0.5) 90%, transparent 100%);
+}
+/* 融合渐变叠加层：统一色调 + 地面阴影 */
+.atmosphere-canvas .layer-fusion {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 40%, transparent 35%, rgba(0,0,0,0.04) 75%, rgba(0,0,0,0.08) 100%),
+    linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.06) 100%);
+  z-index: 50;
+}
+/* 暗角效果 */
+.atmosphere-canvas .layer-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 80px 24px rgba(0,0,0,0.06);
+  z-index: 51;
+  border-radius: var(--radius);
+}
+.atmosphere-canvas .layer-furniture .furniture-item,
+.atmosphere-canvas .layer-character .character-item {
+  position: absolute;
+  cursor: grab;
+  user-select: none;
+  /* 层容器为 pointer-events:none，元素自身需开启以接收拖拽/缩放事件 */
+  pointer-events: auto;
+  transition: transform 0.15s ease, filter 0.15s ease;
+  /* 更真实的地面投影：物体"落"在地面上 */
+  filter:
+    drop-shadow(0 6px 10px rgba(0,0,0,0.18))
+    drop-shadow(0 2px 3px rgba(0,0,0,0.12))
+    drop-shadow(0 0 1px rgba(0,0,0,0.08));
+}
+.atmosphere-canvas .layer-furniture .furniture-item:active,
+.atmosphere-canvas .layer-character .character-item:active {
+  cursor: grabbing;
+}
+/* 人物元素：更柔和的投影，模拟站在地面 */
+.atmosphere-canvas .layer-character .character-item {
+  filter:
+    drop-shadow(0 8px 12px rgba(0,0,0,0.2))
+    drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+/* 选中状态 */
+.atmosphere-canvas .furniture-item.selected,
+.atmosphere-canvas .character-item.selected {
+  outline: 2px dashed rgba(232, 180, 184, 0.7);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.atmosphere-canvas .furniture-item img,
+.atmosphere-canvas .character-item img {
+  width: 100%;
+  height: auto;
+  display: block;
+  pointer-events: none;
+}
+/* 删除按钮 - 选中时显示 */
+.atmosphere-canvas .furniture-item .remove-btn,
+.atmosphere-canvas .character-item .remove-btn {
+  position: absolute;
+  top: -10px; right: -10px;
+  width: 22px; height: 22px;
+  background: #e8b4b8;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: auto;
+  z-index: 10;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+.atmosphere-canvas .furniture-item.selected .remove-btn,
+.atmosphere-canvas .character-item.selected .remove-btn {
+  opacity: 1;
+}
+/* 缩放手柄（四角通用样式） */
+.atmosphere-canvas .furniture-item .resize-handle,
+.atmosphere-canvas .character-item .resize-handle {
+  position: absolute;
+  width: 14px; height: 14px;
+  background: #fff;
+  border: 2px solid #e8b4b8;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: auto;
+  z-index: 10;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+/* 四角定位 */
+.atmosphere-canvas .furniture-item .resize-handle.handle-tl,
+.atmosphere-canvas .character-item .resize-handle.handle-tl {
+  top: -7px; left: -7px; cursor: nwse-resize;
+}
+.atmosphere-canvas .furniture-item .resize-handle.handle-tr,
+.atmosphere-canvas .character-item .resize-handle.handle-tr {
+  top: -7px; right: -7px; cursor: nesw-resize;
+}
+.atmosphere-canvas .furniture-item .resize-handle.handle-bl,
+.atmosphere-canvas .character-item .resize-handle.handle-bl {
+  bottom: -7px; left: -7px; cursor: nesw-resize;
+}
+.atmosphere-canvas .furniture-item .resize-handle.handle-br,
+.atmosphere-canvas .character-item .resize-handle.handle-br {
+  bottom: -7px; right: -7px; cursor: nwse-resize;
+}
+.atmosphere-canvas .furniture-item.selected .resize-handle,
+.atmosphere-canvas .character-item.selected .resize-handle {
+  opacity: 1;
+}
+/* 悬浮温柔情绪提示 */
+.atmosphere-canvas .furniture-item .item-mood-tip,
+.atmosphere-canvas .character-item .item-mood-tip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+  background: rgba(255,255,255,0.96);
+  color: #9a7b80;
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 5px 11px;
+  border-radius: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+  z-index: 20;
+  max-width: 200px;
+}
+.atmosphere-canvas .furniture-item .item-mood-tip.show,
+.atmosphere-canvas .character-item .item-mood-tip.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-10px);
+}
+/* 操作提示 */
+.atmosphere-canvas .furniture-item.selected .item-hint,
+.atmosphere-canvas .character-item.selected .item-hint {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.85);
+  padding: 2px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.atmosphere-canvas-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  pointer-events: none;
+}
+.atmosphere-canvas-placeholder svg {
+  width: 48px; height: 48px;
+  margin-bottom: 10px;
+  opacity: 0.4;
+}
+
+/* 素材栏 */
+.atmosphere-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.atmosphere-sidebar-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  padding: 4px 2px;
+}
+.atmosphere-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.atmosphere-tab {
+  padding: 5px 10px;
+  border-radius: 14px;
+  font-size: 12px;
+  background: var(--bg);
+  color: var(--text-light);
+  cursor: pointer;
+  transition: var(--transition);
+  border: 1px solid transparent;
+}
+.atmosphere-tab:hover {
+  background: var(--primary-light);
+  color: var(--text);
+}
+.atmosphere-tab.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.atmosphere-assets {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 4px;
+  max-height: calc(100vh - 280px);
+}
+.atmosphere-assets::-webkit-scrollbar { width: 3px; }
+.atmosphere-asset-item {
+  aspect-ratio: 1;
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  padding: 6px;
+  transition: var(--transition);
+  border: 1.5px solid transparent;
+}
+.atmosphere-asset-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--primary-light);
+}
+.atmosphere-asset-item:active { cursor: grabbing; }
+.atmosphere-asset-item img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+}
+.atmosphere-asset-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 拖拽时的样式 */
+.dragging-ghost {
+  opacity: 0.6;
+  transform: scale(0.9);
+}
+.drag-over {
+  border-color: var(--primary) !important;
+  background: var(--primary-light) !important;
+}
+
+/* 氛围小屋底部操作 */
+.atmosphere-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 16px;
+  padding-bottom: 20px;
+}
+
+/* 已选提示 */
+.atmosphere-selected-info {
+  font-size: 12px;
+  color: var(--text-light);
+  text-align: center;
+  margin-top: 8px;
+  min-height: 18px;
+}
+
+/* 移动端：素材栏在下方 */
+@media (max-width: 768px) {
+  .atmosphere-workspace {
+    flex-direction: column;
+  }
+  .atmosphere-sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .atmosphere-assets {
+    grid-template-columns: repeat(4, 1fr);
+    max-height: 200px;
+  }
+  .atmosphere-tabs {
+    width: 100%;
+  }
+}
+
+/* 完成搭建动画 */
+.atmosphere-canvas.animating {
+  overflow: hidden;
+}
+.atmosphere-canvas.animating .layer-fusion,
+.atmosphere-canvas.animating .layer-vignette {
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+.atmosphere-canvas.animating .layer-fusion.show,
+.atmosphere-canvas.animating .layer-vignette.show {
+  opacity: 1;
+}
+/* 背景层动画：由远及近（缩放从大到小） */
+.atmosphere-canvas .layer-bg.anim-zoom {
+  transform: scale(1.4);
+  opacity: 0;
+}
+.atmosphere-canvas .layer-bg.anim-zoom.show {
+  transform: scale(1);
+  opacity: 1;
+}
+/* 基底层淡入 */
+.atmosphere-canvas .layer-base.anim-hidden {
+  opacity: 0;
+  transform: scale(0.92);
+}
+.atmosphere-canvas .layer-base.anim-hidden.show {
+  opacity: 1;
+  transform: scale(1);
+}
+/* 家具/人物逐个淡入 */
+.atmosphere-canvas .furniture-item.anim-hidden,
+.atmosphere-canvas .character-item.anim-hidden {
+  opacity: 0;
+  transform: scale(0.5) translateY(20px);
+}
+.atmosphere-canvas .furniture-item.anim-show,
+.atmosphere-canvas .character-item.anim-show {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+/* 动画遮罩文字 */
+.atmos-anim-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 240, 236, 0.9);
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  border-radius: var(--radius);
+}
+.atmos-anim-overlay.show {
+  opacity: 1;
+}
+.atmos-anim-text {
+  font-size: 16px;
+  color: var(--text-light);
+  letter-spacing: 2px;
+}

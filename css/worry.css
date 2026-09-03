@@ -1,0 +1,155 @@
+/* ========== 模块3: 放走坏心情 ========== */
+.worry-input-area {
+  text-align: center;
+  padding: 20px 0;
+}
+.worry-input-area textarea {
+  width: 100%;
+  max-width: 400px;
+  min-height: 100px;
+  padding: 16px;
+  border: 1px solid var(--primary-light);
+  border-radius: var(--radius);
+  background: var(--card);
+  font-size: 14px;
+  color: var(--text);
+  resize: vertical;
+  transition: var(--transition);
+}
+.worry-input-area textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(196,168,160,0.15); }
+
+/* 便利贴动画 */
+.sticky-note-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.2);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+.sticky-note-overlay.show { display: flex; }
+.sticky-note {
+  background: #fff9e8;
+  width: 300px;
+  max-width: 85vw;
+  padding: 30px 24px 24px;
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  position: relative;
+  animation: noteDrop 0.5s ease;
+  transform-origin: top center;
+}
+@keyframes noteDrop {
+  from { transform: translateY(-80px) rotate(-5deg); opacity: 0; }
+  to { transform: translateY(0) rotate(0); opacity: 1; }
+}
+.sticky-note::before {
+  content: '📌';
+  position: absolute;
+  top: -12px; left: 50%;
+  transform: translateX(-50%);
+  font-size: 24px;
+}
+.sticky-note-text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  margin-bottom: 18px;
+  text-align: center;
+  word-break: break-word;
+}
+
+/* 粉碎确认弹窗 */
+.shatter-confirm {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.25);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+  backdrop-filter: blur(4px);
+}
+.shatter-confirm.show { display: flex; }
+.shatter-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  max-width: 340px;
+  width: 85vw;
+  text-align: center;
+  animation: popIn 0.4s ease;
+}
+@keyframes popIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.shatter-card p {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.7;
+  margin-bottom: 18px;
+}
+
+/* 漂流瓶动画 */
+.bottle-scene {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(180deg, #b5cce0, #d9e5df);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1002;
+  overflow: hidden;
+}
+.bottle-scene.show { display: flex; }
+.bottle-scene-inner {
+  text-align: center;
+  animation: floatIn 1s ease;
+}
+@keyframes floatIn {
+  from { transform: translateY(60px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.bottle-icon {
+  font-size: 80px;
+  display: block;
+  margin-bottom: 12px;
+  animation: bottleBob 3s ease-in-out infinite;
+}
+@keyframes bottleBob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-12px) rotate(2deg); }
+}
+.bottle-text {
+  font-size: 16px;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
+}
+.bottle-waves {
+  position: absolute;
+  bottom: 0;
+  left: 0; right: 0;
+  height: 80px;
+  overflow: hidden;
+}
+.bottle-waves .wave {
+  position: absolute;
+  bottom: 0;
+  width: 200%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0px, transparent 20px,
+    rgba(255,255,255,0.3) 20px, rgba(255,255,255,0.3) 40px
+  );
+  animation: waveMove 6s linear infinite;
+}
+@keyframes waveMove {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+

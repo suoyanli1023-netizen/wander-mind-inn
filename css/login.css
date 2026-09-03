@@ -1,0 +1,145 @@
+/* ========== 登录页面 ========== */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: linear-gradient(180deg, #f7f3f0 0%, #fce8ea 50%, #e8eef4 100%);
+}
+.login-container {
+  width: 100%;
+  max-width: 400px;
+}
+.login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.login-logo {
+  width: 72px; height: 72px;
+  margin: 0 auto 16px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--card);
+  border-radius: 50%;
+  box-shadow: var(--shadow-soft);
+  font-size: 36px;
+}
+.login-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+}
+.login-subtitle {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-top: 6px;
+}
+.login-section-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 20px 0 10px;
+  text-align: center;
+  letter-spacing: 1px;
+}
+.login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-weight: 600;
+  transition: all 0.25s ease;
+  margin-bottom: 10px;
+}
+.login-btn:active { transform: scale(0.97); }
+.login-btn-wechat { background: #07c160; color: #fff; }
+.login-btn-github { background: #24292e; color: #fff; }
+.login-btn-google { background: #fff; color: #3c4043; border: 1px solid #dadce0; }
+.login-email-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--primary-light);
+  border-radius: var(--radius-xs);
+  font-size: 14px;
+  background: var(--card);
+  color: var(--text);
+  margin-bottom: 10px;
+  transition: border-color 0.25s;
+}
+.login-email-input:focus { border-color: var(--primary); }
+.login-email-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.login-email-row .login-email-input { flex: 1; margin-bottom: 0; }
+.login-code-btn {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border-radius: var(--radius-xs);
+  background: var(--accent-light);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.25s;
+}
+.login-code-btn:disabled { opacity: 0.5; }
+.login-email-submit {
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  transition: all 0.25s;
+  margin-top: 4px;
+}
+.login-email-submit:active { transform: scale(0.97); }
+.login-divider {
+  display: flex;
+  align-items: center;
+  margin: 24px 0;
+}
+.login-divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--primary-light);
+}
+.login-divider-text {
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.login-overseas {
+  margin-top: auto;
+  padding-top: 30px;
+}
+.login-debug-btn {
+  display: block;
+  margin: 20px auto 0;
+  padding: 8px 20px;
+  border-radius: 20px;
+  background: transparent;
+  border: 1px dashed var(--text-muted);
+  color: var(--text-muted);
+  font-size: 12px;
+  transition: all 0.25s;
+}
+.login-debug-btn:hover { border-color: var(--primary); color: var(--primary); }
+.login-user-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: var(--bg-mint, #e8f4ee);
+  border-radius: 20px;
+  font-size: 13px;
+  color: var(--text);
+}
+
