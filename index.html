@@ -1855,7 +1855,7 @@ a { text-decoration: none; color: inherit; }
         <option value="@163.com">163 邮箱 (@163.com)</option>
       </select>
       <div class="login-email-row">
-        <input type="text" class="login-email-input" id="emailUser" placeholder="输入邮箱账号">
+        <input type="text" class="login-email-input" id="emailUser" placeholder="输入邮箱账号" maxlength="64">
         <button class="login-code-btn" id="sendCodeBtn">获取验证码</button>
       </div>
       <input type="text" class="login-email-input" id="emailCode" placeholder="输入验证码" maxlength="6">
@@ -1870,6 +1870,9 @@ a { text-decoration: none; color: inherit; }
         <button class="login-btn login-btn-google" id="googleLogin">
           <span style="font-size:20px;">🔍</span> Google 登录
         </button>
+        <div style="margin-top:4px;font-size:11px;color:var(--text-muted);text-align:center;line-height:1.4;">
+          演示功能，暂未接入正式认证<br>授权回调后需使用调试按钮进入
+        </div>
       </div>
 
       <!-- 调试按钮 -->
@@ -2346,15 +2349,15 @@ a { text-decoration: none; color: inherit; }
       <div class="card">
         <div class="projection-q">
           <div class="projection-q-label">1. 你在这幅画中看到了什么？</div>
-          <textarea id="draw-q1" placeholder="慢慢看，不着急…" oninput="checkDrawDone()"></textarea>
+          <textarea id="draw-q1" placeholder="慢慢看，不着急…" maxlength="300" oninput="checkDrawDone()"></textarea>
         </div>
         <div class="projection-q">
           <div class="projection-q-label">2. 这幅画让你联想到什么感受？</div>
-          <textarea id="draw-q2" placeholder="也许是某种颜色、某个温度…" oninput="checkDrawDone()"></textarea>
+          <textarea id="draw-q2" placeholder="也许是某种颜色、某个温度…" maxlength="300" oninput="checkDrawDone()"></textarea>
         </div>
         <div class="projection-q">
           <div class="projection-q-label">3. 如果这幅画有一个故事，它会是什么？</div>
-          <textarea id="draw-q3" placeholder="你可以天马行空…" oninput="checkDrawDone()"></textarea>
+          <textarea id="draw-q3" placeholder="你可以天马行空…" maxlength="300" oninput="checkDrawDone()"></textarea>
         </div>
       </div>
 
@@ -2410,7 +2413,7 @@ a { text-decoration: none; color: inherit; }
     <div class="card">
       <div class="card-title">✍️ 写下你的糟心事</div>
       <div class="worry-input-area">
-        <textarea id="worry-input" placeholder="把心里那些让你不舒服的事写下来吧…&#10;写在这里，然后我们一起把它们送走 🌊"></textarea>
+        <textarea id="worry-input" placeholder="把心里那些让你不舒服的事写下来吧…&#10;写在这里，然后我们一起把它们送走 🌊" maxlength="500"></textarea>
         <div class="btn-center-row mt-12">
           <button class="btn-secondary" onclick="exitModule('page-worry')">← 退出</button>
           <button class="btn-primary" id="worry-submit-btn" onclick="submitWorry()">📌 贴上去</button>
@@ -2569,6 +2572,32 @@ a { text-decoration: none; color: inherit; }
 <!-- JavaScript -->
 <!-- ============================================================ -->
 <script>
+// =============================================================
+// XSS 安全工具
+// =============================================================
+
+/**
+ * 将用户输入安全地转义为 HTML 文本节点。
+ * 仅用于将文本插入 HTML 文本节点位置（如 <p>${text}</p> 中的 text）。
+ * 禁止用于：onclick/href/src/style/data 属性/HTML 标签名/CSS/JS 字符串。
+ * 优先使用 createElement + textContent 代替此函数。
+ */
+function escapeHtml(str) {
+  if (typeof str !== 'string') return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/**
+ * Unicode 安全截断：按码点（而非 UTF-16 单元）截取字符串。
+ * 避免 emoji 等多字节字符被从中间切断。
+ */
+function truncateUnicode(str, maxLen) {
+  if (typeof str !== 'string') return '';
+  return Array.from(str.trim()).slice(0, maxLen).join('');
+}
+
 // =============================================================
 // 全局状态
 // =============================================================
@@ -3081,25 +3110,46 @@ function logout() {
   STATE.currentPage = 'page-login';
 }
 
-// ---- OAuth 回调处理（URL 中带 code 参数时自动执行）----
+// ---- OAuth 回调处理（URL 中带 code 参数时执行）----
+// 演示模式：不进行服务端 token 交换，不自动登录成功
+// 正式 OAuth 留到服务端认证阶段实现
 function handleOAuthCallback() {
   const urlParams = new URLSearchParams(window.location.search);
   const code = urlParams.get('code');
   const state = urlParams.get('state');
   if (!code) return false;
 
-  // 根据 state 判断来源平台
-  const provider = state || 'unknown';
-  // 实际项目中此处应向后端交换 access_token 再获取用户信息
-  // 此处用 code 生成临时用户标识，模拟登录成功
-  const tempId = provider + '_' + code.substring(0, 16);
-  const tempName = provider === 'github' ? 'GitHub用户' :
-                   provider === 'google' ? 'Google用户' : '已登录用户';
-  handleLoginSuccess(provider, tempId, tempName);
+  // state 白名单校验：仅允许 github 或 google
+  const ALLOWED_STATES = ['github', 'google'];
+  if (!state || !ALLOWED_STATES.includes(state)) {
+    // 非法 state，清除 URL 参数后返回
+    window.history.replaceState({}, document.title, window.location.pathname);
+    return false;
+  }
 
-  // 清除 URL 中的 code 参数
+  // code 类型与最大长度限制（不限制字符集，因为合法 OAuth code 可能包含多种字符）
+  // 仅限制为字符串类型且最大 512 字符
+  if (typeof code !== 'string' || code.length > 512) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    return false;
+  }
+
+  // 演示模式：不把 code 写入用户资料，不自动登录
+  // 仅在控制台提示，并清除 URL 参数
+  console.log('[演示模式] 收到 ' + state + ' OAuth 回调，code 长度: ' + code.length + '。服务端认证尚未接入，不会自动登录。');
   window.history.replaceState({}, document.title, window.location.pathname);
-  return true;
+
+  // 在登录页显示提示信息
+  const loginPage = document.getElementById('page-login');
+  if (loginPage) {
+    const notice = document.createElement('div');
+    notice.style.cssText = 'margin-top:12px;padding:10px 16px;background:#fff3cd;border-radius:8px;font-size:13px;color:#856404;text-align:center;';
+    notice.textContent = '已收到 ' + state + ' 授权回调，但正式认证服务尚未接入。请使用「调试：模拟登录」进入。';
+    const container = loginPage.querySelector('.login-container');
+    if (container) container.appendChild(notice);
+  }
+
+  return false;
 }
 
 // ---- 邮箱验证码模拟发送 ----
@@ -3493,7 +3543,17 @@ let exitCallback = null;
 
 function showExitModal(tags) {
   const container = document.getElementById('exit-mood-tags');
-  container.innerHTML = tags.map(t => `<span class="exit-mood-tag">${t}</span>`).join('');
+  // 安全清空
+  while (container.firstChild) {
+    container.removeChild(container.firstChild);
+  }
+  // 使用 createElement + textContent 构建
+  tags.forEach(t => {
+    const span = document.createElement('span');
+    span.className = 'exit-mood-tag';
+    span.textContent = t;
+    container.appendChild(span);
+  });
   document.getElementById('exit-overlay').classList.add('show');
 }
 
@@ -3657,9 +3717,10 @@ function newJourney() {
   }
   const name = prompt('给这次旅程起个名字吧 💫', `心灵漫游 ${STATE.archives.length + 1}`);
   if (!name) return;
+  const safeName = truncateUnicode(name, 30);
   STATE.archives.push({
     id: Date.now().toString(),
-    name: name,
+    name: safeName,
     date: new Date().toLocaleDateString('zh-CN'),
     stickers: []
   });
@@ -3673,7 +3734,7 @@ function renameJourney(idx) {
   if (!arc) return;
   const newName = prompt('给这段旅程一个新名字吧 📓', arc.name);
   if (newName) {
-    arc.name = newName;
+    arc.name = truncateUnicode(newName, 30);
     saveToStorage();
     renderArchive();
   }
@@ -5234,7 +5295,7 @@ function buildDrawInterpretation() {
   <p style="margin-top:8px;"><strong>2. 你这样讲故事——你的叙事方式本身就是信号</strong><br>${narrativeStyle}</p>
   <p style="margin-top:8px;"><strong>3. 你在画里看到了什么——每个意象都是内心主题的线索</strong><br>${contentStr}</p>
   ${comboInsight ? `<p style="margin-top:8px;"><strong>4. 特别注意</strong><br>${comboInsight}</p>` : ''}
-  <p style="margin-top:8px;"><strong>${comboInsight ? '5' : '4'}. 你的完整回答</strong><br><span style="font-style:italic;color:var(--text-light);">"看到什么"：${q1 || '——'}<br>"感受什么"：${q2 || '——'}<br>"故事是什么"：${q3 || '——'}</span></p>
+  <p style="margin-top:8px;"><strong>${comboInsight ? '5' : '4'}. 你的完整回答</strong><br><span style="font-style:italic;color:var(--text-light);">"看到什么"：${escapeHtml(q1) || '——'}<br>"感受什么"：${escapeHtml(q2) || '——'}<br>"故事是什么"：${escapeHtml(q3) || '——'}</span></p>
   <p style="font-weight:600;color:var(--text);margin-top:12px;">三、温柔的提醒</p>
   <p>Kramer（1971）说艺术有一只"第三只手"——它在你和你的情绪之间保持着一个安全的距离，让你可以触碰深层感受而不被淹没。Lomas（1976）称这种距离为"创造性缓冲"。你刚才写下的每一个字，都是此刻你内心最真实的风景——不需要修改，不需要评判，它已经被看见了。</p>${ref}`;
 }
@@ -5256,7 +5317,7 @@ function completeDraw() {
       <div class="card" style="background:#ede8f4;margin-top:12px;">
         <div class="card-title">💬 你的感受</div>
         <p style="font-size:13px;color:var(--text-light);line-height:1.8;font-style:italic;">
-          "${STATE.drawState.q1.slice(0, 60)}…"
+          "${escapeHtml(STATE.drawState.q1.slice(0, 60))}…"
         </p>
       </div>
       <div class="collapse-wrap">
@@ -5401,7 +5462,7 @@ function buildWorryInterpretation(worryText) {
   const catStr = detected.map(c => catNames[c] || '').filter(Boolean).join('、');
   const theoryStr = detected.map(c => catTheories[c] || '').filter(Boolean).join(' ');
 
-  return `<p style="font-weight:600;color:var(--text);">一、你的释放：${text ? '"' + text.slice(0, 40) + (text.length > 40 ? '…' : '') + '"' : '——'}</p>
+  return `<p style="font-weight:600;color:var(--text);">一、你的释放：${text ? '"' + escapeHtml(text.slice(0, 40)) + (text.length > 40 ? '…' : '') + '"' : '——'}</p>
   <p>${intensityDesc}</p>
   <p style="font-weight:600;color:var(--text);margin-top:12px;">二、基于你本次书写内容的具体分析</p>
   <p><strong>烦恼类型：${catStr}</strong><br>${theoryStr}</p>
@@ -5465,15 +5526,35 @@ function renderFragments() {
     return;
   }
   card.style.display = 'block';
-  list.innerHTML = STATE.worryState.fragments.map((f, i) => `
-    <div style="flex-shrink:0;width:140px;padding:12px;background:#fff9e8;border-radius:12px;border:1px solid #f0e8d8;cursor:pointer;" onclick="reprocessFragment(${i})">
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">📌 碎片 ${i+1}</div>
-      <div style="font-size:12px;color:var(--text-light);line-height:1.4;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">
-        ${f.text}
-      </div>
-      <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">${f.date}</div>
-    </div>
-  `).join('');
+
+  // 安全清空：逐个移除子元素
+  while (list.firstChild) {
+    list.removeChild(list.firstChild);
+  }
+
+  // 使用 createElement + textContent 构建 DOM，避免 XSS
+  STATE.worryState.fragments.forEach((f, i) => {
+    const frag = document.createElement('div');
+    frag.style.cssText = 'flex-shrink:0;width:140px;padding:12px;background:#fff9e8;border-radius:12px;border:1px solid #f0e8d8;cursor:pointer;';
+    frag.addEventListener('click', () => reprocessFragment(i));
+
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:11px;color:var(--text-muted);margin-bottom:4px;';
+    label.textContent = '📌 碎片 ' + (i + 1);
+    frag.appendChild(label);
+
+    const text = document.createElement('div');
+    text.style.cssText = 'font-size:12px;color:var(--text-light);line-height:1.4;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;';
+    text.textContent = f.text || '';
+    frag.appendChild(text);
+
+    const date = document.createElement('div');
+    date.style.cssText = 'font-size:10px;color:var(--text-muted);margin-top:4px;';
+    date.textContent = f.date || '';
+    frag.appendChild(date);
+
+    list.appendChild(frag);
+  });
 }
 
 function reprocessFragment(idx) {
