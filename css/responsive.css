@@ -5,6 +5,11 @@
   .module-card { padding: 18px 14px; }
   .house-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .house-option svg { width: 28px; height: 28px; }
+  #house-deco-grid .tooltip {
+    width: 120px;
+    white-space: normal;
+    text-align: center;
+  }
   .choice-btn { min-width: 120px; padding: 14px 20px; font-size: 14px; }
   .settings-panel { width: 100vw; max-width: 100vw; }
   .archive-header { flex-direction: column; gap: 8px; align-items: flex-start; }
