@@ -5,7 +5,7 @@
 **产品名**：心绪漫游小栈（Soul Journey Cabin）
 **技术栈**：纯原生 HTML + CSS + JavaScript（无框架、无构建工具、无 npm 依赖）
 **运行方式**：直接用浏览器打开 `index.html`，或用任意静态服务器（如 `python -m http.server`）
-**存储方式**：`localStorage`（key: `soul_journey`）
+**存储方式**：使用多个 `localStorage` key。业务旅程与模块进度使用 `soul_journey`；登录演示、音效和 API 设置分别使用其他 key（详见“本地存储事实”）。
 **项目本质**：一个情绪疗愈 Web 应用，用户通过 5 个情绪模块完成心理投射活动，收集"情绪贴纸"到"情绪旅程"中。
 
 ### 5 个业务模块
@@ -60,13 +60,13 @@ project-root/
 │   ├── storage.js          localStorage读写(39行)
 │   ├── soundfx.js          音效系统(85行)
 │   ├── navigation.js       页面导航+退出弹窗(59行)
-│   ├── auth.js             登录/OAuth(211行)
+│   ├── auth.js             GitHub/Google OAuth 演示、微信 postMessage、邮箱演示登录(211行)
 │   ├── journey.js          旅程管理+贴纸(171行)
 │   ├── worry.js            放走坏心情模块(225行)
 │   ├── draw.js             绘画投射模块(534行)
 │   └── (待拆分模块文件)
 ├── assets/
-│   ├── audio/              15个wav音效文件
+│   ├── audio/              14个 WAV 音效文件
 │   ├── backgrounds/        背景图(8张)
 │   ├── cabin-basics/       小屋基底(6张)
 │   ├── furniture/          家具(13张)
@@ -92,7 +92,7 @@ project-root/
 11. <script> 内联业务代码 — 其余所有模块(约1990行)
 ```
 
-**关键规则**：所有 JS 文件都是普通同步 `<script src>`，不使用 ES Module、不使用 import/export、不使用框架。全局函数和变量直接挂载到 window。
+**关键规则**：所有 JS 文件都是普通同步 `<script src>`，不使用 ES Module、不使用 import/export、不使用框架。各脚本共享同一个全局词法环境；顶层函数声明可供后续脚本和 HTML `onclick` 调用。顶层 `const` / `let` 不会自动成为 `window` 属性；只有 `STATE`、`SoundFX` 等通过 `window.STATE = ...`、`window.SoundFX = ...` 显式挂载的对象才可按对应属性从 `window` 访问。
 
 ---
 
@@ -113,6 +113,12 @@ const STATE = window.STATE = {
   originalTitle: ''
 };
 ```
+
+### 本地存储事实
+
+- `js/storage.js` 的 `soul_journey` 只序列化 `archives`、`houseState`、`drawState`、`worryState`、`choiceState` 五个字段；它不保存 `currentJourneyId`、`atmosphereState`、`currentPage` 或 `originalTitle`，因此不能描述为“整个 STATE”。
+- `js/auth.js` 还使用 `login_user_id`、`login_nickname`、`login_provider`、`login_time`、`email_code`、`email_address`、`user_openid`。
+- `js/soundfx.js` 使用 `sound_enabled`；`index.html` 的设置面板使用 `api_key`、`api_url`。
 
 ### 跨模块核心函数
 
@@ -268,11 +274,17 @@ d9455ea  04a-css-modularization
 
 #### 跨模块依赖
 - `STATE.houseState` — 状态读写
-- `SoundFX.setMood()` / `SoundFX.click()` / `SoundFX.complete()` — 音效
-- `addStickerAndBack()` — journey.js
-- `navigateTo()` — navigation.js
-- `escapeHtml()` — xss.js（如果结果页使用）
-- `saveToStorage()` — storage.js
+- `SoundFX.setMood()` — `selectHouseMood()` 直接调用，用于设置情绪音效基调
+- `toggleCollapse()` — `completeHouse()` 生成的结果页内联 `onclick` 直接引用；该函数目前仍在 `index.html`
+- `addStickerAndBack()` — `completeHouse()` 生成的保存按钮内联 `onclick` 直接引用，来自 `journey.js`
+
+这 10 个极简小屋函数当前不直接调用 `SoundFX.click()`、`SoundFX.complete()`、`navigateTo()`、`escapeHtml()` 或 `saveToStorage()`。页面导航、持久化等行为可能在外围流程发生，但不应列为这 10 个函数的直接依赖。
+
+#### 既有基底值映射问题（仅记录，不在 04C-4 修复）
+
+- HTML 选项和 `STATE.houseState.base` 写入值为 `classic`、`treehouse`、`igloo`。
+- `getHouseComfortMessage()`、`buildHouseInterpretation()` 的部分判断和映射使用 `classic`、`tree`、`dome`。
+- 因此 `treehouse` / `igloo` 无法命中部分使用 `tree` / `dome` 的安慰语或解读分支。这是当前产品代码中已经存在的映射不一致；04C-4 只做机械迁移，必须原样保留，不得借迁移修复。
 
 ### 04C-5：氛围小屋（atmosphere）模块拆分
 
@@ -446,13 +458,15 @@ d9455ea  04a-css-modularization
 
 ## 9. 关键测试规范
 
+> 本节包含此前阶段留下的历史验收记录和后续测试规范。本轮 HANDOFF.md 事实修正没有重新执行浏览器功能、XSS、视口或双版本回归测试；下述历史结果不得表述或理解为本轮测试结论。
+
 ### XSS 防护机制
 
 本项目使用两种 XSS 防护方式：
 1. **createElement + textContent**（首选）：所有用户输入通过 DOM API 设置，不经过 innerHTML
 2. **escapeHtml()**（备选）：将文本转义后插入 innerHTML 模板字符串
 
-已验证的安全点：
+历史验收记录中标注为已验证的安全点：
 - 旅程名称：`truncateUnicode(name, 30)` → `textContent` 设置
 - worry 碎片：`textContent` 渲染
 - draw 问答：`textContent` 渲染
@@ -480,7 +494,7 @@ d9455ea  04a-css-modularization
 3. 对两个版本执行完全相同的操作
 4. 比较 STATE、DOM、localStorage 结果是否一致
 
-### 已知环境限制
+### 历史验收时记录的环境限制
 
 - 自动化浏览器无法设置精确视口（1366×768 / 390×844），需标注 BLOCKED 由人工补测
 - `prompt()`/`confirm()` 在自动化环境中不可用，需安装测试替身：
@@ -585,7 +599,7 @@ state.js → xss.js → validation.js → storage.js → soundfx.js
 
 ## 12. 重要提醒
 
-1. **不要修改已拆分的 JS 文件**：state.js、storage.js、xss.js、validation.js、soundfx.js、navigation.js、auth.js、journey.js、worry.js、draw.js 已经过严格测试，不要碰。
+1. **不要修改已拆分的 JS 文件**：state.js、storage.js、xss.js、validation.js、soundfx.js、navigation.js、auth.js、journey.js、worry.js、draw.js 在对应拆分阶段留有历史验收记录；本轮未重新执行这些测试。后续机械拆分默认不要修改这些文件。
 
 2. **HTML onclick 属性必须保留**：所有 `onclick="functionName()"` 是全局函数调用的入口，不能改为 addEventListener。
 
@@ -597,7 +611,7 @@ state.js → xss.js → validation.js → storage.js → soundfx.js
 
 6. **navigation.js 中的 navigateTo() 调用了 initAtmosphere() 和 initChoicePage()**：这两个函数目前仍在 index.html 内联中。当 04C-5 和 04C-6 完成后，它们会移到 atmosphere.js 和 choice.js，navigateTo() 的调用不需要修改（因为全局函数在 script 加载后可用）。
 
-7. **localStorage key 只有一个**：`soul_journey`，存储整个 STATE 对象的 JSON 序列化。不要增加新的 key。
+7. **localStorage 使用多个 key**：`soul_journey` 只保存 `archives`、`houseState`、`drawState`、`worryState`、`choiceState`；登录演示、音效和 API 设置还使用“本地存储事实”中列出的其他 key。机械拆分不得改变既有 key 或数据格式。
 
 8. **测试临时文件必须放在系统 TEMP 目录**，不要在项目根目录留下 baseline_*、test_*.py、qa_* 等文件。
 
@@ -605,4 +619,4 @@ state.js → xss.js → validation.js → storage.js → soundfx.js
 
 10. **API Key 仅为 UI 预留功能**：设置面板中的 OpenAI API Key 输入框只做 localStorage 存取（`api_key`、`api_url`），没有任何实际的 `fetch()` 调用或 AI 请求代码。心理学解读全部是本地硬编码的规则逻辑，不依赖任何后端。
 
-11. **OAuth 认证是跳转式但无后端验证**：auth.js 中的 GitHub/Google/微信登录是纯前端 OAuth 跳转，回调 URL 指向腾讯云开发函数（`cloudbase-d4gvblu5z203a2fd7.tcloudbaseapp.com/callback`），但该项目本身没有后端服务器或数据库。
+11. **登录方式需要区分**：GitHub 和 Google 按钮会跳转到各自 OAuth 授权地址，回调地址配置为腾讯云开发函数；前端收到 `code` 后仅做演示提示，不交换 token，也不会自动登录。微信入口通过 `window.postMessage({ type: 'getWxLogin' })` 发起，并监听 `wxLoginSuccess` 消息，不是 OAuth 跳转。邮箱验证码由前端随机生成、写入 `localStorage` 并直接显示在提示框中，属于演示登录，不是服务端邮件认证。该项目本身没有后端服务器或数据库。
