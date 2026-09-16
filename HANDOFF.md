@@ -39,7 +39,12 @@ page-choice       此刻心意二选一页
 
 ```
 project-root/
-├── index.html              (2779行) HTML结构 + 剩余内联JS (~1990行)
+├── index.html              (2338行) HTML结构 + 剩余内联JS
+├── favicon.svg             静态 SVG 图标
+├── CHANGELOG.md            提交级变更记录
+├── docs/
+│   ├── PRODUCT_EVOLUTION.md 产品演进记录
+│   └── TESTING.md           04C-4 实际验收证据
 ├── css/
 │   ├── variables.css       CSS变量定义
 │   ├── global.css          全局样式
@@ -64,7 +69,8 @@ project-root/
 │   ├── journey.js          旅程管理+贴纸(171行)
 │   ├── worry.js            放走坏心情模块(225行)
 │   ├── draw.js             绘画投射模块(534行)
-│   └── (待拆分模块文件)
+│   ├── house.js           极简小屋模块（442行、10个函数）
+│   └── (atmosphere / choice 待拆分)
 ├── assets/
 │   ├── audio/              14个 WAV 音效文件
 │   ├── backgrounds/        背景图(8张)
@@ -76,7 +82,7 @@ project-root/
 └── .gitignore
 ```
 
-### Script 加载顺序（index.html 行 784-793）
+### Script 加载顺序（index.html 行 785-795）
 
 ```
 1. js/state.js           — STATE全局对象
@@ -88,9 +94,13 @@ project-root/
 7. js/auth.js            — 登录系统
 8. js/journey.js         — renderArchive/newJourney/addStickerToArchive/addStickerAndBack
 9. js/worry.js           — 放走坏心情模块(10个函数)
-10. js/draw.js            — 绘画投射模块(5个函数+DRAW_IMAGES)
-11. <script> 内联业务代码 — 其余所有模块(约1990行)
+10. js/draw.js           — 绘画投射模块(5个函数+DRAW_IMAGES)
+11. js/house.js          — 极简小屋模块(10个函数)
+12. <script> 主内联业务代码 — 氛围小屋、此刻心意及公共UI
+13. <script> 末尾音频解锁代码
 ```
+
+**当前外部 JS 数量：11。** 加载顺序为 state → xss → validation → storage → soundfx → navigation → auth → journey → worry → draw → house → 主内联 script → 音频解锁 script。
 
 **关键规则**：所有 JS 文件都是普通同步 `<script src>`，不使用 ES Module、不使用 import/export、不使用框架。各脚本共享同一个全局词法环境；顶层函数声明可供后续脚本和 HTML `onclick` 调用。顶层 `const` / `let` 不会自动成为 `window` 属性；只有 `STATE`、`SoundFX` 等通过 `window.STATE = ...`、`window.SoundFX = ...` 显式挂载的对象才可按对应属性从 `window` 访问。
 
@@ -141,6 +151,11 @@ const STATE = window.STATE = {
 ## 4. Git 提交历史
 
 ```
+2fb8a7e  fix-house-mobile-tooltip-overflow  ← 04C-4 正式关闭时的最后产品代码提交
+7ad9cd2  fix-favicon-404
+b7f1a44  04c4-house-extraction
+a0a0c50  docs-handoff-accuracy-fixes
+cd8bef8  docs-codex-handoff
 5602e81  04c3-draw-extraction       ← 交接前最后一个产品代码提交
 ca03b0a  04c2-worry-extraction
 3870981  04c1-journey-extraction
@@ -155,13 +170,13 @@ d9455ea  04a-css-modularization
 
 分支：`feature/ai-product-v2`
 
-> **注意**：交接前最后一个产品代码提交为 5602e81（04c3-draw-extraction）。提交交接文档后，分支 HEAD 将变为 docs-codex-handoff 提交；Codex 接管时应以真实 `git rev-parse` 结果为准。5602e81 用于证明 04C-4 尚未开始前的产品代码基线。
+> **注意**：交接前最后产品代码提交为 5602e81；04C-4 正式关闭时的最后产品代码提交为 2fb8a7e。这两个值都是历史基线，不是永久“当前 HEAD”。每次任务开始须以真实 `git rev-parse --short HEAD` 为准。
 
 ---
 
 ## 5. 重构方法论：机械拆分（Mechanical Extraction）
 
-本项目正在执行一个将巨型 index.html 内联 JS 逐步拆分到独立文件的计划。已完成 3 个业务模块的拆分（journey/worry/draw），还有 3 个业务模块待拆分（house/atmosphere/choice）+ 1 个最终整合阶段（04D，待评估是否需要）。
+本项目正在执行一个将巨型 index.html 内联 JS 逐步拆分到独立文件的计划。已完成 4 个业务模块的拆分（journey/worry/draw/house），还有 2 个业务模块待拆分（atmosphere/choice）+ 1 个最终整合阶段（04D，待评估是否需要）。
 
 ### 核心原则
 
@@ -185,7 +200,7 @@ d9455ea  04a-css-modularization
 5. **机械一致性验证**：以父提交为基线，逐函数比较内容一致性
 6. **双版本功能回归**：用 `git archive` 建立基线，两个服务器对比测试
 7. **XSS 回归**：3 个 payload（`<script>`、`<img onerror>`、`javascript:`）走真实流程+刷新
-8. **兼容性检查**：draw.js 返回 200、无新增 console.error、无资源 404
+8. **兼容性检查**：新模块 JS 返回 200、无新增 console.error、无资源 404
 9. **提交门禁**：`git diff --stat` 只有 2 个文件、`git diff --check` 无警告
 10. **提交**：`git add index.html js/xxx.js && git commit -m "04cN-xxx-extraction"`
 11. **测试残留清理**：临时文件只放系统 TEMP 目录
@@ -194,8 +209,8 @@ d9455ea  04a-css-modularization
 
 - `git reset`、`git restore`、`git checkout --`、`git clean`
 - 删除现有产品文件
-- 修改已拆分出的 JS 文件（state/storage/xss/validation/soundfx/navigation/auth/journey/worry/draw）
-- 修改 CSS、assets、favicon
+- 修改已拆分出的 JS 文件（state/storage/xss/validation/soundfx/navigation/auth/journey/worry/draw/house）
+- 修改 CSS、assets、favicon（机械拆分期间；独立质量修复另有提交与验收）
 - 修改 DOMContentLoaded、末尾音频解锁 script
 - 提前开始后续模块（严格顺序）
 
@@ -230,21 +245,29 @@ d9455ea  04a-css-modularization
   - 常量：`DRAW_IMAGES`（3张SVG抽象画）
   - 函数（5个）：startDraw、checkDrawDone、generateEmpathy、buildDrawInterpretation、completeDraw
 
+- [x] **04c4-house-extraction**：提取 house.js（10 个函数，无独立顶层变量），与 a0a0c50 基线逐字一致，产品级最终回归 FAIL=0、BLOCKED=0
+
+### 04C-4 独立质量修复与最终验收
+
+- `7ad9cd2`：新增 `favicon.svg` 并在 `index.html` head 声明图标，浏览器默认 `/favicon.ico` 404 已消失。
+- `2fb8a7e`：在 `css/responsive.css` 为 480px 以下装饰提示框设 120px 宽并允许换行，原 390×844 的 9px 横向溢出已消失。
+- 两项问题在 a0a0c50 拆分前基线同样存在，并非 house.js 引入。04C-4 完整实测见 `docs/TESTING.md`；最终 FAIL=0、BLOCKED=0。
+
 ---
 
-## 7. 待完成的工作
+## 7. 04C-4 已完成与后续待完成工作
 
-> **下一阶段计划：04C-4 极简小屋机械拆分。目前尚未开始，index.html 中的极简小屋函数仍保持原状。**
+> **下一阶段计划：04C-5 氛围小屋机械拆分，尚未开始。04C-4 已完成并正式验收通过。**
 
-### 04C-4：极简小屋（house）模块拆分
+### 04C-4：极简小屋（house）模块拆分（已完成）
 
-**候选迁移内容**（均仍在 index.html 内联 script 中，尚未开始迁移）：
+**已迁移内容**（下列行号仅指 a0a0c50 拆分前基线；当前定义在 js/house.js）：
 
 #### 顶层变量
 - 无独立顶层变量（状态通过 STATE.houseState 管理）
 
 #### 模块注释
-- 行 1079-1081：`// 模块1: 极简小屋`
+- a0a0c50 基线行 1079-1081：`// 模块1: 极简小屋`；模块注释已迁入 `js/house.js`
 
 #### 函数（10个）
 | 函数 | 起始行 | 作用 |
@@ -270,7 +293,7 @@ d9455ea  04a-css-modularization
 - 结果页动态 `addStickerAndBack('🏡', ...)`
 
 #### DOMContentLoaded 中的恢复逻辑（保留在 index.html）
-- 行 952-982：恢复 houseState 选择状态到 UI
+- a0a0c50 基线行 952-982：恢复 houseState 选择状态到 UI；当前 `index.html` 中逻辑保留原样
 
 #### 跨模块依赖
 - `STATE.houseState` — 状态读写
@@ -278,76 +301,84 @@ d9455ea  04a-css-modularization
 - `toggleCollapse()` — `completeHouse()` 生成的结果页内联 `onclick` 直接引用；该函数目前仍在 `index.html`
 - `addStickerAndBack()` — `completeHouse()` 生成的保存按钮内联 `onclick` 直接引用，来自 `journey.js`
 
-这 10 个极简小屋函数当前不直接调用 `SoundFX.click()`、`SoundFX.complete()`、`navigateTo()`、`escapeHtml()` 或 `saveToStorage()`。页面导航、持久化等行为可能在外围流程发生，但不应列为这 10 个函数的直接依赖。
+这 10 个极简小屋函数不直接调用 `SoundFX.click()`、`SoundFX.complete()`、`navigateTo()`、`escapeHtml()` 或 `saveToStorage()`。页面导航、持久化等行为可能在外围流程发生，但不应列为这 10 个函数的直接依赖。
 
-#### 既有基底值映射问题（仅记录，不在 04C-4 修复）
+#### 既有基底值映射问题（KNOWN_ISSUE，04C-4 未修复）
 
 - HTML 选项和 `STATE.houseState.base` 写入值为 `classic`、`treehouse`、`igloo`。
 - `getHouseComfortMessage()`、`buildHouseInterpretation()` 的部分判断和映射使用 `classic`、`tree`、`dome`。
-- 因此 `treehouse` / `igloo` 无法命中部分使用 `tree` / `dome` 的安慰语或解读分支。这是当前产品代码中已经存在的映射不一致；04C-4 只做机械迁移，必须原样保留，不得借迁移修复。
+- 因此 `treehouse` / `igloo` 无法命中部分使用 `tree` / `dome` 的安慰语或解读分支。这是当前产品代码中已经存在的映射不一致；04C-4 仅作机械迁移并原样保留该行为；最终验收确认与 a0a0c50 基线一致，未借迁移修复。
 
-### 04C-5：氛围小屋（atmosphere）模块拆分
+### 04C-5：氛围小屋（atmosphere）模块拆分（下一阶段，尚未开始）
 
 **候选迁移内容**：
 
 #### 顶层变量（8 个，其中 3 个 const + 5 个 let）
-- `ATMOSPHERE_ASSETS`（const, 行 835）— 资源路径映射
-- `ATMOS_TAB_NAMES`（const, 行 883）
-- `atmosCurrentTab`（let, 行 890）
-- `atmosDragItem`（let, 行 891）
-- `atmosDragOffset`（let, 行 892）
-- `atmosCanvasScale`（let, 行 893）
-- `atmosPinching`（let, 行 894）
-- `ATMOS_MOOD_TIPS`（const, 行 1817）
+- `ATMOSPHERE_ASSETS`（const, 行 837）— 资源路径映射
+- `ATMOS_TAB_NAMES`（const, 行 885）
+- `atmosCurrentTab`（let, 行 892）
+- `atmosDragItem`（let, 行 893）
+- `atmosDragOffset`（let, 行 894）
+- `atmosCanvasScale`（let, 行 895）
+- `atmosPinching`（let, 行 896）
+- `ATMOS_MOOD_TIPS`（const, 行 1376）
 
 #### 函数（21个）
 | 函数 | 起始行 | 作用 |
 |------|--------|------|
-| `switchAtmosTab(cat)` | 1525 | 切换素材标签 |
-| `renderAtmosAssets(cat)` | 1534 | 渲染素材列表 |
-| `selectAtmosBg(path)` | 1555 | 选择背景 |
-| `selectAtmosBase(path)` | 1565 | 选择基底 |
-| `addAtmosFurniture(path)` | 1574 | 添加家具 |
-| `addAtmosCharacter(path)` | 1599 | 添加人物 |
-| `createAtmosItem(...)` | 1621 | 创建画布元素 |
-| `processAtmosImage(imgEl)` | 1641 | 图片处理/采样 |
-| `removeAtmosItem(id)` | 1786 | 移除画布元素 |
-| `updateAtmosPlaceholder()` | 1798 | 更新占位提示 |
-| `updateAtmosSelectedInfo()` | 1804 | 更新选中信息 |
-| `setupAtmosInteraction(el)` | 1826 | 拖拽/缩放交互（约150行） |
-| `initAtmosCanvasDeselect()` | 1979 | 点击空白取消选中 |
-| `applyAtmosCanvasScale()` | 1992 | 应用缩放 |
-| `initAtmosCanvasZoom()` | 1996 | 双指缩放初始化 |
-| `completeAtmosphere()` | 2044 | 完成搭建 |
-| `sampleAvgColor(imgEl)` | 2145 | 采样平均颜色 |
-| `analyzeAtmosphereChoices()` | 2169 | 分析选择 |
-| `buildAtmosphereInterpretation()` | 2226 | 构建心理解读 |
-| `showAtmosphereResult()` | 2323 | 显示结果页 |
-| `initAtmosphere()` | 2378 | 初始化氛围小屋 |
+| `switchAtmosTab(cat)` | 1084 | 切换素材标签 |
+| `renderAtmosAssets(cat)` | 1093 | 渲染素材列表 |
+| `selectAtmosBg(path)` | 1114 | 选择背景 |
+| `selectAtmosBase(path)` | 1124 | 选择基底 |
+| `addAtmosFurniture(path)` | 1133 | 添加家具 |
+| `addAtmosCharacter(path)` | 1158 | 添加人物 |
+| `createAtmosItem(...)` | 1180 | 创建画布元素 |
+| `processAtmosImage(imgEl)` | 1200 | 图片处理/采样 |
+| `removeAtmosItem(id)` | 1345 | 移除画布元素 |
+| `updateAtmosPlaceholder()` | 1357 | 更新占位提示 |
+| `updateAtmosSelectedInfo()` | 1363 | 更新选中信息 |
+| `setupAtmosInteraction(el)` | 1385 | 拖拽/缩放交互（约150行） |
+| `initAtmosCanvasDeselect()` | 1538 | 点击空白取消选中 |
+| `applyAtmosCanvasScale()` | 1551 | 应用缩放 |
+| `initAtmosCanvasZoom()` | 1555 | 双指缩放初始化 |
+| `completeAtmosphere()` | 1603 | 完成搭建 |
+| `sampleAvgColor(imgEl)` | 1704 | 采样平均颜色 |
+| `analyzeAtmosphereChoices()` | 1728 | 分析选择 |
+| `buildAtmosphereInterpretation()` | 1785 | 构建心理解读 |
+| `showAtmosphereResult()` | 1882 | 显示结果页 |
+| `initAtmosphere()` | 1937 | 初始化氛围小屋 |
+
+#### 跨模块依赖
+
+- `STATE.atmosphereState` — 保存背景、基底、家具、人物与 `done` 字段；当前 `soul_journey` 不序列化该模块状态。
+- `SoundFX.click/select/place/animBg/animBase/complete()` — 标签、素材选择、放置和完成动画的直接音效调用。
+- `toggleCollapse()` — `showAtmosphereResult()` 生成的解读折叠入口引用，当前仍在 `index.html` 公共 UI。
+- `addStickerAndBack()` — 结果页保存按钮引用，来自 `journey.js`。
+- `navigateTo()` 位于 `navigation.js`；进入 `page-atmosphere` 时由它调用 `initAtmosphere()`。
 
 **注意**：`initAtmosphere()` 被 navigation.js 的 `navigateTo()` 调用（导航到 page-atmosphere 时），也 被 DOMContentLoaded 调用。
 
-### 04C-6：此刻心意（choice）模块拆分
+### 04C-6：此刻心意（choice）模块拆分（尚未开始）
 
 **候选迁移内容**：
 
 #### 顶层变量
-- `CHOICE_QUESTION_POOL`（行 796）— 题库（约34行）
-- `CHOICE_QUESTIONS_COUNT`（行 830）= 10
+- `CHOICE_QUESTION_POOL`（行 798）— 题库（约34行）
+- `CHOICE_QUESTIONS_COUNT`（行 832）= 10
 
 #### 函数（10个）
 | 函数 | 起始行 | 作用 |
 |------|--------|------|
-| `initChoicePage()` | 2424 | 初始化页面 |
-| `resumeChoice()` | 2436 | 继续上次 |
-| `startChoice()` | 2444 | 开始答题 |
-| `getChoiceQuestions()` | 2464 | 获取题目 |
-| `renderChoice()` | 2470 | 渲染当前题 |
-| `answerChoice(optionIdx)` | 2495 | 回答 |
-| `saveChoiceProgress()` | 2509 | 保存进度 |
-| `showChoiceResult()` | 2515 | 显示结果 |
-| `getChoiceComfortMessage(...)` | 2599 | 获取安慰语 |
-| `buildChoiceInterpretation(...)` | 2635 | 构建深度心理解读（约130行，最长） |
+| `initChoicePage()` | 1983 | 初始化页面 |
+| `resumeChoice()` | 1995 | 继续上次 |
+| `startChoice()` | 2003 | 开始答题 |
+| `getChoiceQuestions()` | 2023 | 获取题目 |
+| `renderChoice()` | 2029 | 渲染当前题 |
+| `answerChoice(optionIdx)` | 2054 | 回答 |
+| `saveChoiceProgress()` | 2068 | 保存进度 |
+| `showChoiceResult()` | 2074 | 显示结果 |
+| `getChoiceComfortMessage(...)` | 2158 | 获取安慰语 |
+| `buildChoiceInterpretation(...)` | 2194 | 构建深度心理解读（约130行，最长） |
 
 **注意**：`initChoicePage()` 被 navigation.js 的 `navigateTo()` 调用，也被 DOMContentLoaded 调用。
 
@@ -356,9 +387,9 @@ d9455ea  04a-css-modularization
 完成所有模块拆分后，index.html 应仅剩：
 - HTML 结构（页面、组件）
 - CSS 引用
-- `<script src>` 引用（当前 10 个外部 JS 文件；完成 04C-4～04C-6 后预计 13 个）
-- DOMContentLoaded 初始化代码（约90行，行 903-996）
-- 吉祥物短句（showMascotBubble 等，约20行）
+- `<script src>` 引用（当前 11 个外部 JS 文件；完成 04C-5～04C-6 后预计 13 个）
+- DOMContentLoaded 初始化代码（约90行；实际行号以当前 `index.html` 为准）
+- 吉祥物短句（showMascotBubble 等；实际行号以当前 `index.html` 为准）
 - 设置面板（toggleSettings、saveApiKey、saveApiUrl、toggleSoundSetting 已在 soundfx.js）
 - detectMoodTags（退出弹窗依赖）
 - toggleCollapse（通用折叠功能）
@@ -374,91 +405,80 @@ d9455ea  04a-css-modularization
 
 ## 8. index.html 内联 script 中剩余的函数清单
 
-以下是 **仍留在 index.html 内联 `<script>` 中** 的所有函数和变量，按位置排序：
+以下是 **仍留在 index.html 主内联 `<script>` 中** 的顶层值、生命周期与公共 UI、atmosphere、choice 函数，按当前源码位置排序。极简小屋的 10 个函数已在 `js/house.js`，不属于此清单。行号来自本次真实磁盘代码；后续编辑后须重新核对。
 
-### 公共/UI 函数（6 个函数 + 4 个变量）
-| 函数/变量 | 行 | 归属 |
-|-----------|-----|------|
-| `CHOICE_QUESTION_POOL` | 796 | choice 模块（04C-6 待迁移） |
-| `CHOICE_QUESTIONS_COUNT` | 830 | choice 模块（04C-6 待迁移） |
-| `ATMOSPHERE_ASSETS` | 835 | atmosphere 模块（04C-5 待迁移） |
-| `ATMOS_TAB_NAMES` | 883 | atmosphere 模块（04C-5 待迁移） |
-| `atmosCurrentTab` | 890 | atmosphere 模块（04C-5 待迁移） |
-| `atmosDragItem` | 891 | atmosphere 模块（04C-5 待迁移） |
-| `atmosDragOffset` | 892 | atmosphere 模块（04C-5 待迁移） |
-| `atmosCanvasScale` | 893 | atmosphere 模块（04C-5 待迁移） |
-| `atmosPinching` | 894 | atmosphere 模块（04C-5 待迁移） |
-| `_visibilityGuard` | 900 | 公共（可能保留或迁入 common-ui） |
-| `_exitModalTimer` | 901 | 公共（可能保留或迁入 common-ui） |
-| `DOMContentLoaded` | 903 | 生命周期（保留或迁入 main.js） |
-| `MASCOT_QUOTES` | 1001 | 公共（可能保留或迁入 common-ui） |
-| `mascotTimers` | 1006 | 公共 |
-| `showMascotBubble(el, type)` | 1007 | 公共 |
-| `toggleSettings()` | 1031 | 公共（设置面板） |
-| `saveApiKey()` | 1044 | 公共（API Key） |
-| `saveApiUrl()` | 1050 | 公共（API Key） |
-| `detectMoodTags()` | 1056 | 公共（被 exitModule 调用） |
-| `toggleCollapse(id)` | 1072 | 公共（通用折叠） |
+### 顶层值、生命周期与公共/UI
 
-### 极简小屋函数（04C-4 待迁移）
-| 函数 | 行 |
-|------|-----|
-| `selectHouseBase(val)` | 1082 |
-| `selectHouseBg(val)` | 1090 |
-| `selectHouseMood(val)` | 1098 |
-| `toggleDeco(val)` | 1107 |
-| `selectDiy(cat, val)` | 1120 |
-| `updateHousePreview()` | 1131 |
-| `generateHouseSVG(base, bg, mood, decos, diy)` | 1174 |
-| `getHouseComfortMessage()` | 1382 |
-| `buildHouseInterpretation()` | 1418 |
-| `completeHouse()` | 1486 |
+| 函数/变量 | 当前行 | 归属 |
+|---|---:|---|
+| `CHOICE_QUESTION_POOL` | 798 | choice 模块（04C-6 待迁移） |
+| `CHOICE_QUESTIONS_COUNT` | 832 | choice 模块（04C-6 待迁移） |
+| `ATMOSPHERE_ASSETS` | 837 | atmosphere 模块（04C-5 待迁移） |
+| `ATMOS_TAB_NAMES` | 885 | atmosphere 模块（04C-5 待迁移） |
+| `atmosCurrentTab` | 892 | atmosphere 模块（04C-5 待迁移） |
+| `atmosDragItem` | 893 | atmosphere 模块（04C-5 待迁移） |
+| `atmosDragOffset` | 894 | atmosphere 模块（04C-5 待迁移） |
+| `atmosCanvasScale` | 895 | atmosphere 模块（04C-5 待迁移） |
+| `atmosPinching` | 896 | atmosphere 模块（04C-5 待迁移） |
+| `_visibilityGuard` | 902 | 公共 UI |
+| `_exitModalTimer` | 903 | 公共 UI |
+| `DOMContentLoaded` | 905 | 生命周期与状态恢复 |
+| `MASCOT_QUOTES` | 1003 | 公共 UI |
+| `mascotTimers` | 1008 | 公共 UI |
+| `showMascotBubble` | 1009 | 公共 UI |
+| `toggleSettings` | 1033 | 设置面板 |
+| `saveApiKey` | 1046 | API 设置预留 UI |
+| `saveApiUrl` | 1052 | API 设置预留 UI |
+| `detectMoodTags` | 1058 | 退出弹窗依赖 |
+| `toggleCollapse` | 1074 | 通用折叠 |
 
-### 氛围小屋函数（04C-5 待迁移）
-| 函数 | 行 |
-|------|-----|
-| `switchAtmosTab(cat)` | 1525 |
-| `renderAtmosAssets(cat)` | 1534 |
-| `selectAtmosBg(path)` | 1555 |
-| `selectAtmosBase(path)` | 1565 |
-| `addAtmosFurniture(path)` | 1574 |
-| `addAtmosCharacter(path)` | 1599 |
-| `createAtmosItem(...)` | 1621 |
-| `processAtmosImage(imgEl)` | 1641 |
-| `ATMOS_MOOD_TIPS` | 1817 |
-| `removeAtmosItem(id)` | 1786 |
-| `updateAtmosPlaceholder()` | 1798 |
-| `updateAtmosSelectedInfo()` | 1804 |
-| `setupAtmosInteraction(el)` | 1826 |
-| `initAtmosCanvasDeselect()` | 1979 |
-| `applyAtmosCanvasScale()` | 1992 |
-| `initAtmosCanvasZoom()` | 1996 |
-| `completeAtmosphere()` | 2044 |
-| `sampleAvgColor(imgEl)` | 2145 |
-| `analyzeAtmosphereChoices()` | 2169 |
-| `buildAtmosphereInterpretation()` | 2226 |
-| `showAtmosphereResult()` | 2323 |
-| `initAtmosphere()` | 2378 |
+### 氛围小屋值与函数（04C-5 待迁移）
+
+| 函数/变量 | 当前行 |
+|---|---:|
+| `switchAtmosTab` | 1084 |
+| `renderAtmosAssets` | 1093 |
+| `selectAtmosBg` | 1114 |
+| `selectAtmosBase` | 1124 |
+| `addAtmosFurniture` | 1133 |
+| `addAtmosCharacter` | 1158 |
+| `createAtmosItem` | 1180 |
+| `processAtmosImage` | 1200 |
+| `removeAtmosItem` | 1345 |
+| `updateAtmosPlaceholder` | 1357 |
+| `updateAtmosSelectedInfo` | 1363 |
+| `ATMOS_MOOD_TIPS` | 1376 |
+| `setupAtmosInteraction` | 1385 |
+| `initAtmosCanvasDeselect` | 1538 |
+| `applyAtmosCanvasScale` | 1551 |
+| `initAtmosCanvasZoom` | 1555 |
+| `completeAtmosphere` | 1603 |
+| `sampleAvgColor` | 1704 |
+| `analyzeAtmosphereChoices` | 1728 |
+| `buildAtmosphereInterpretation` | 1785 |
+| `showAtmosphereResult` | 1882 |
+| `initAtmosphere` | 1937 |
 
 ### 此刻心意函数（04C-6 待迁移）
-| 函数 | 行 |
-|------|-----|
-| `initChoicePage()` | 2424 |
-| `resumeChoice()` | 2436 |
-| `startChoice()` | 2444 |
-| `getChoiceQuestions()` | 2464 |
-| `renderChoice()` | 2470 |
-| `answerChoice(optionIdx)` | 2495 |
-| `saveChoiceProgress()` | 2509 |
-| `showChoiceResult()` | 2515 |
-| `getChoiceComfortMessage(...)` | 2599 |
-| `buildChoiceInterpretation(...)` | 2635 |
+
+| 函数 | 当前行 |
+|---|---:|
+| `initChoicePage` | 1983 |
+| `resumeChoice` | 1995 |
+| `startChoice` | 2003 |
+| `getChoiceQuestions` | 2023 |
+| `renderChoice` | 2029 |
+| `answerChoice` | 2054 |
+| `saveChoiceProgress` | 2068 |
+| `showChoiceResult` | 2074 |
+| `getChoiceComfortMessage` | 2158 |
+| `buildChoiceInterpretation` | 2194 |
 
 ---
 
 ## 9. 关键测试规范
 
-> 本节包含此前阶段留下的历史验收记录和后续测试规范。本轮 HANDOFF.md 事实修正没有重新执行浏览器功能、XSS、视口或双版本回归测试；下述历史结果不得表述或理解为本轮测试结论。
+> 本节包含此前阶段留下的历史验收记录和后续测试规范。本节下述历史结果不得表述为本次测试；04C-4 最终浏览器功能、XSS、视口和资源回归已实际执行，证据见 `docs/TESTING.md`。本次文档同步没有重新跑浏览器。
 
 ### XSS 防护机制
 
@@ -496,7 +516,7 @@ d9455ea  04a-css-modularization
 
 ### 历史验收时记录的环境限制
 
-- 自动化浏览器无法设置精确视口（1366×768 / 390×844），需标注 BLOCKED 由人工补测
+- 历史环境曾无法设置精确视口；04C-4 最终验收已用 CDP 实际设置七个目标视口，并在 `docs/TESTING.md` 记录真实数值
 - `prompt()`/`confirm()` 在自动化环境中不可用，需安装测试替身：
   ```javascript
   window.alert = function() {};
@@ -531,6 +551,10 @@ index.html (HTML结构 + onclick)
     │       └── 调用: SoundFX.* (soundfx.js)
     │       └── 调用: escapeHtml() (xss.js)
     │
+    ├── house.js ── 10 个极简小屋函数
+    │       ├── 调用: STATE.houseState / SoundFX.setMood()
+    │       └── 动态按钮引用: toggleCollapse() / addStickerAndBack()
+    │
     └── index.html 内联 script
             ├── DOMContentLoaded
             │       ├── initLoginPage() (auth.js)
@@ -541,12 +565,11 @@ index.html (HTML结构 + onclick)
             │       ├── SoundFX.init() (soundfx.js)
             │       ├── updateSoundToggleUI() (soundfx.js)
             │       ├── renderFragments() (worry.js)
-            │       ├── updateHousePreview() (待迁移到house.js)
+            │       ├── updateHousePreview() (house.js)
             │       ├── initAtmosphere() (待迁移到atmosphere.js)
             │       ├── initChoicePage() (待迁移到choice.js)
             │       └── SoundFX.setMood() (soundfx.js)
             ├── 公共函数 (showMascotBubble, toggleSettings, detectMoodTags, toggleCollapse, ...)
-            ├── 极简小屋函数 (04C-4 待迁移)
             ├── 氛围小屋函数 (04C-5 待迁移)
             └── 此刻心意函数 (04C-6 待迁移)
 ```
@@ -558,9 +581,9 @@ index.html (HTML结构 + onclick)
 ### 执行顺序
 
 ```
-04C-4: house.js (极简小屋)
+04C-4: house.js (极简小屋，已完成并正式验收)
   ↓
-04C-5: atmosphere.js (氛围小屋)
+04C-5: atmosphere.js (氛围小屋，下一阶段尚未开始)
   ↓
 04C-6: choice.js (此刻心意)
   ↓
@@ -599,13 +622,13 @@ state.js → xss.js → validation.js → storage.js → soundfx.js
 
 ## 12. 重要提醒
 
-1. **不要修改已拆分的 JS 文件**：state.js、storage.js、xss.js、validation.js、soundfx.js、navigation.js、auth.js、journey.js、worry.js、draw.js 在对应拆分阶段留有历史验收记录；本轮未重新执行这些测试。后续机械拆分默认不要修改这些文件。
+1. **不要修改已拆分的 JS 文件**：state.js、storage.js、xss.js、validation.js、soundfx.js、navigation.js、auth.js、journey.js、worry.js、draw.js、house.js 在对应拆分阶段留有历史验收记录；本轮未重新执行这些测试。后续机械拆分默认不要修改这些文件。
 
 2. **HTML onclick 属性必须保留**：所有 `onclick="functionName()"` 是全局函数调用的入口，不能改为 addEventListener。
 
 3. **DOMContentLoaded 不能拆分**：它包含了跨模块的状态恢复逻辑（house UI 恢复、atmosphere 初始化、choice 初始化），这些调用依赖 DOM 已加载。
 
-4. **generateHouseSVG 是最大的单体函数**（约200行），生成完整的 SVG 字符串，包含大量硬编码的路径数据。迁移时必须逐字保持。
+4. **generateHouseSVG 是已迁移的大型函数**（约200行），生成完整的 SVG 字符串，包含大量硬编码的路径数据。04C-4 与 a0a0c50 基线逐字一致；后续不得借机械拆分修改。
 
 5. **buildChoiceInterpretation 是最长的心理学解读函数**（约130行），包含7个分析维度。迁移时必须逐字保持。
 
@@ -620,3 +643,7 @@ state.js → xss.js → validation.js → storage.js → soundfx.js
 10. **API Key 仅为 UI 预留功能**：设置面板中的 OpenAI API Key 输入框只做 localStorage 存取（`api_key`、`api_url`），没有任何实际的 `fetch()` 调用或 AI 请求代码。心理学解读全部是本地硬编码的规则逻辑，不依赖任何后端。
 
 11. **登录方式需要区分**：GitHub 和 Google 按钮会跳转到各自 OAuth 授权地址，回调地址配置为腾讯云开发函数；前端收到 `code` 后仅做演示提示，不交换 token，也不会自动登录。微信入口通过 `window.postMessage({ type: 'getWxLogin' })` 发起，并监听 `wxLoginSuccess` 消息，不是 OAuth 跳转。邮箱验证码由前端随机生成、写入 `localStorage` 并直接显示在提示框中，属于演示登录，不是服务端邮件认证。该项目本身没有后端服务器或数据库。
+
+12. **当前阶段与 KNOWN_ISSUE**：04C-4 已完成并正式验收，04C-5 尚未开始。HTML/STATE 的 `treehouse`、`igloo` 与部分安慰语/解读规则的 `tree`、`dome` 不一致，为拆分前既有问题，本阶段未修复。
+
+13. **专题文档**：产品演进见 `docs/PRODUCT_EVOLUTION.md`，04C-4 本次实际验收数值见 `docs/TESTING.md`，提交级变更见 `CHANGELOG.md`。这些文件仅记录已确认事实与规划边界。
