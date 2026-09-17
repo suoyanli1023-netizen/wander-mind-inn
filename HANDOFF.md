@@ -39,12 +39,12 @@ page-choice       此刻心意二选一页
 
 ```
 project-root/
-├── index.html              (2338行) HTML结构 + 剩余内联JS
+├── index.html              (994行) HTML结构 + 剩余公共内联JS
 ├── favicon.svg             静态 SVG 图标
 ├── CHANGELOG.md            提交级变更记录
 ├── docs/
 │   ├── PRODUCT_EVOLUTION.md 产品演进记录
-│   └── TESTING.md           04C-4 实际验收证据
+│   └── TESTING.md           04C-4～04D 实际验收证据
 ├── css/
 │   ├── variables.css       CSS变量定义
 │   ├── global.css          全局样式
@@ -69,8 +69,9 @@ project-root/
 │   ├── journey.js          旅程管理+贴纸(171行)
 │   ├── worry.js            放走坏心情模块(225行)
 │   ├── draw.js             绘画投射模块(534行)
-│   ├── house.js           极简小屋模块（442行、10个函数）
-│   └── (atmosphere / choice 待拆分)
+│   ├── house.js            极简小屋模块（442行、10个函数）
+│   ├── atmosphere.js       氛围小屋模块（963行、8个顶层值、21个函数）
+│   └── choice.js           此刻心意模块（382行、2个常量、10个函数）
 ├── assets/
 │   ├── audio/              14个 WAV 音效文件
 │   ├── backgrounds/        背景图(8张)
@@ -82,7 +83,7 @@ project-root/
 └── .gitignore
 ```
 
-### Script 加载顺序（index.html 行 785-795）
+### Script 加载顺序（index.html 行 785-797）
 
 ```
 1. js/state.js           — STATE全局对象
@@ -96,11 +97,13 @@ project-root/
 9. js/worry.js           — 放走坏心情模块(10个函数)
 10. js/draw.js           — 绘画投射模块(5个函数+DRAW_IMAGES)
 11. js/house.js          — 极简小屋模块(10个函数)
-12. <script> 主内联业务代码 — 氛围小屋、此刻心意及公共UI
-13. <script> 末尾音频解锁代码
+12. js/atmosphere.js     — 氛围小屋模块(8个顶层值+21个函数)
+13. js/choice.js         — 此刻心意模块(2个常量+10个函数)
+14. <script> 主内联代码 — 生命周期、状态恢复及公共UI
+15. <script> 末尾音频解锁代码
 ```
 
-**当前外部 JS 数量：11。** 加载顺序为 state → xss → validation → storage → soundfx → navigation → auth → journey → worry → draw → house → 主内联 script → 音频解锁 script。
+**当前外部 JS 数量：13；内联 script 数量：2。** 加载顺序为 state → xss → validation → storage → soundfx → navigation → auth → journey → worry → draw → house → atmosphere → choice → 主内联 script → 音频解锁 script。仓库另有 11 个 CSS、14 个 WAV 和根目录 `favicon.svg`。
 
 **关键规则**：所有 JS 文件都是普通同步 `<script src>`，不使用 ES Module、不使用 import/export、不使用框架。各脚本共享同一个全局词法环境；顶层函数声明可供后续脚本和 HTML `onclick` 调用。顶层 `const` / `let` 不会自动成为 `window` 属性；只有 `STATE`、`SoundFX` 等通过 `window.STATE = ...`、`window.SoundFX = ...` 显式挂载的对象才可按对应属性从 `window` 访问。
 
@@ -151,6 +154,9 @@ const STATE = window.STATE = {
 ## 4. Git 提交历史
 
 ```
+71078ef  04c6-choice-extraction       ← 最后一个产品代码提交
+793f3d5  04c5-atmosphere-extraction
+0eeb114  docs-04c4-product-and-engineering-update
 2fb8a7e  fix-house-mobile-tooltip-overflow  ← 04C-4 正式关闭时的最后产品代码提交
 7ad9cd2  fix-favicon-404
 b7f1a44  04c4-house-extraction
@@ -170,13 +176,13 @@ d9455ea  04a-css-modularization
 
 分支：`feature/ai-product-v2`
 
-> **注意**：交接前最后产品代码提交为 5602e81；04C-4 正式关闭时的最后产品代码提交为 2fb8a7e。这两个值都是历史基线，不是永久“当前 HEAD”。每次任务开始须以真实 `git rev-parse --short HEAD` 为准。
+> **注意**：交接前最后产品代码提交为 5602e81；04C-4 正式关闭时的最后产品代码提交为 2fb8a7e；模块化阶段最后产品代码提交为 71078ef。它们是阶段基线，不是永久“当前 HEAD”。每次任务开始须以真实 `git rev-parse --short HEAD` 为准。
 
 ---
 
 ## 5. 重构方法论：机械拆分（Mechanical Extraction）
 
-本项目正在执行一个将巨型 index.html 内联 JS 逐步拆分到独立文件的计划。已完成 4 个业务模块的拆分（journey/worry/draw/house），还有 2 个业务模块待拆分（atmosphere/choice）+ 1 个最终整合阶段（04D，待评估是否需要）。
+本项目将巨型 `index.html` 内联 JS 逐步拆分到独立文件的机械拆分计划已经完成：04C-1～04C-6 全部完成，04D 本地最终整合验收通过。以下方法论保留为历史工程规范和后续类似迁移的参考，不表示仍有待执行的机械拆分阶段。
 
 ### 核心原则
 
@@ -209,7 +215,7 @@ d9455ea  04a-css-modularization
 
 - `git reset`、`git restore`、`git checkout --`、`git clean`
 - 删除现有产品文件
-- 修改已拆分出的 JS 文件（state/storage/xss/validation/soundfx/navigation/auth/journey/worry/draw/house）
+- 无明确独立任务时修改已拆分出的 13 个 JS 文件（state/xss/validation/storage/soundfx/navigation/auth/journey/worry/draw/house/atmosphere/choice）
 - 修改 CSS、assets、favicon（机械拆分期间；独立质量修复另有提交与验收）
 - 修改 DOMContentLoaded、末尾音频解锁 script
 - 提前开始后续模块（严格顺序）
@@ -247,6 +253,12 @@ d9455ea  04a-css-modularization
 
 - [x] **04c4-house-extraction**：提取 house.js（10 个函数，无独立顶层变量），与 a0a0c50 基线逐字一致，产品级最终回归 FAIL=0、BLOCKED=0
 
+- [x] **04c5-atmosphere-extraction**：提取 atmosphere.js（8 个顶层值、21 个函数），与 0eeb114 基线机械一致，双版本回归 FAIL=0、BLOCKED=0
+
+- [x] **04c6-choice-extraction**：提取 choice.js（2 个常量、10 个函数），与 793f3d5 基线机械一致，双版本回归 FAIL=0、BLOCKED=0
+
+- [x] **04D 本地最终整合验收**：完整五模块闭环、存储刷新、XSS、七视口、资源和运行时检查全部通过，FAIL=0、BLOCKED=0；该结论是本地产品验收，不代表生产发布
+
 ### 04C-4 独立质量修复与最终验收
 
 - `7ad9cd2`：新增 `favicon.svg` 并在 `index.html` head 声明图标，浏览器默认 `/favicon.ico` 404 已消失。
@@ -255,9 +267,9 @@ d9455ea  04a-css-modularization
 
 ---
 
-## 7. 04C-4 已完成与后续待完成工作
+## 7. 04C-4～04D 完成状态与模块边界
 
-> **下一阶段计划：04C-5 氛围小屋机械拆分，尚未开始。04C-4 已完成并正式验收通过。**
+> **04C-4、04C-5、04C-6 和 04D 本地最终整合验收均已完成。当前没有待执行的机械拆分阶段。** 后续产品优化、真实 AI 接入或已知问题修复须单独授权。
 
 ### 04C-4：极简小屋（house）模块拆分（已完成）
 
@@ -309,9 +321,9 @@ d9455ea  04a-css-modularization
 - `getHouseComfortMessage()`、`buildHouseInterpretation()` 的部分判断和映射使用 `classic`、`tree`、`dome`。
 - 因此 `treehouse` / `igloo` 无法命中部分使用 `tree` / `dome` 的安慰语或解读分支。这是当前产品代码中已经存在的映射不一致；04C-4 仅作机械迁移并原样保留该行为；最终验收确认与 a0a0c50 基线一致，未借迁移修复。
 
-### 04C-5：氛围小屋（atmosphere）模块拆分（下一阶段，尚未开始）
+### 04C-5：氛围小屋（atmosphere）模块拆分（已完成）
 
-**候选迁移内容**：
+**已迁移内容**：下列行号指 0eeb114 拆分前基线；当前定义位于 `js/atmosphere.js`，提交为 `793f3d5 04c5-atmosphere-extraction`。
 
 #### 顶层变量（8 个，其中 3 个 const + 5 个 let）
 - `ATMOSPHERE_ASSETS`（const, 行 837）— 资源路径映射
@@ -356,38 +368,38 @@ d9455ea  04a-css-modularization
 - `addStickerAndBack()` — 结果页保存按钮引用，来自 `journey.js`。
 - `navigateTo()` 位于 `navigation.js`；进入 `page-atmosphere` 时由它调用 `initAtmosphere()`。
 
-**注意**：`initAtmosphere()` 被 navigation.js 的 `navigateTo()` 调用（导航到 page-atmosphere 时），也 被 DOMContentLoaded 调用。
+**注意**：`initAtmosphere()` 被 navigation.js 的 `navigateTo()` 调用（导航到 page-atmosphere 时），也被 DOMContentLoaded 调用。迁移保留这些入口和全部静态、动态 `onclick`。8 个顶层值、21 个函数、注释与真实相对顺序均与 0eeb114 基线一致；Mouse、Touch、Wheel、Canvas、五阶段完成动画、贴纸、资源和其他模块烟雾回归均实际执行，FAIL=0、BLOCKED=0。
 
-### 04C-6：此刻心意（choice）模块拆分（尚未开始）
+### 04C-6：此刻心意（choice）模块拆分（已完成）
 
-**候选迁移内容**：
+**已迁移内容**：下列行号指 793f3d5 拆分前基线；当前定义位于 `js/choice.js`，提交为 `71078ef 04c6-choice-extraction`。
 
 #### 顶层变量
-- `CHOICE_QUESTION_POOL`（行 798）— 题库（约34行）
-- `CHOICE_QUESTIONS_COUNT`（行 832）= 10
+- `CHOICE_QUESTION_POOL`（行 799）— 题库（约34行）
+- `CHOICE_QUESTIONS_COUNT`（行 833）= 10
 
 #### 函数（10个）
 | 函数 | 起始行 | 作用 |
 |------|--------|------|
-| `initChoicePage()` | 1983 | 初始化页面 |
-| `resumeChoice()` | 1995 | 继续上次 |
-| `startChoice()` | 2003 | 开始答题 |
-| `getChoiceQuestions()` | 2023 | 获取题目 |
-| `renderChoice()` | 2029 | 渲染当前题 |
-| `answerChoice(optionIdx)` | 2054 | 回答 |
-| `saveChoiceProgress()` | 2068 | 保存进度 |
-| `showChoiceResult()` | 2074 | 显示结果 |
-| `getChoiceComfortMessage(...)` | 2158 | 获取安慰语 |
-| `buildChoiceInterpretation(...)` | 2194 | 构建深度心理解读（约130行，最长） |
+| `initChoicePage()` | 1020 | 初始化页面 |
+| `resumeChoice()` | 1032 | 继续上次 |
+| `startChoice()` | 1040 | 开始答题 |
+| `getChoiceQuestions()` | 1060 | 获取题目 |
+| `renderChoice()` | 1066 | 渲染当前题 |
+| `answerChoice(optionIdx)` | 1091 | 回答 |
+| `saveChoiceProgress()` | 1105 | 保存进度 |
+| `showChoiceResult()` | 1111 | 显示结果 |
+| `getChoiceComfortMessage(...)` | 1195 | 获取安慰语 |
+| `buildChoiceInterpretation(...)` | 1231 | 构建深度心理解读（约130行，最长） |
 
-**注意**：`initChoicePage()` 被 navigation.js 的 `navigateTo()` 调用，也被 DOMContentLoaded 调用。
+**注意**：`initChoicePage()` 被 navigation.js 的 `navigateTo()` 调用，也被 DOMContentLoaded 调用。迁移保留随机抽题、十题顺序、进度保存、退出、继续、刷新恢复、结果和贴纸流程。2 个常量和 10 个函数与 793f3d5 基线一致；双版本实际回归 FAIL=0、BLOCKED=0。
 
-### 04D：最终整合（预计）
+### 04D：最终整合验收（本地已通过）
 
-完成所有模块拆分后，index.html 应仅剩：
+完成所有模块拆分后，index.html 当前仅剩：
 - HTML 结构（页面、组件）
 - CSS 引用
-- `<script src>` 引用（当前 11 个外部 JS 文件；完成 04C-5～04C-6 后预计 13 个）
+- `<script src>` 引用（13 个外部 JS 文件）
 - DOMContentLoaded 初始化代码（约90行；实际行号以当前 `index.html` 为准）
 - 吉祥物短句（showMascotBubble 等；实际行号以当前 `index.html` 为准）
 - 设置面板（toggleSettings、saveApiKey、saveApiUrl、toggleSoundSetting 已在 soundfx.js）
@@ -396,89 +408,42 @@ d9455ea  04a-css-modularization
 - _visibilityGuard / _exitModalTimer 顶层变量
 - 末尾音频解锁 script（2行）
 
-预计可能需要：
+如后续有明确授权，可评估：
 - 创建 `js/common-ui.js`（toggleCollapse、detectMoodTags、showMascotBubble、MASCOT_QUOTES、mascotTimers）
 - 创建 `js/main.js`（DOMContentLoaded 初始化逻辑）
 - 或将剩余公共函数直接保留在 index.html 内联中
+
+04D 在本地干净 `71078ef` 上实际完成登录、旅程增删改、五模块完整流程、同一旅程五类贴纸、刷新与存储、三个 XSS payload、七个视口、资源和运行时检查。产品测试 FAIL=0、BLOCKED=0。验收没有产品代码提交，也不表示已经生产发布。
 
 ---
 
 ## 8. index.html 内联 script 中剩余的函数清单
 
-以下是 **仍留在 index.html 主内联 `<script>` 中** 的顶层值、生命周期与公共 UI、atmosphere、choice 函数，按当前源码位置排序。极简小屋的 10 个函数已在 `js/house.js`，不属于此清单。行号来自本次真实磁盘代码；后续编辑后须重新核对。
+以下是 **仍留在当前 `index.html` 主内联 `<script>` 中** 的全部顶层值、生命周期入口和函数，按磁盘源码位置重新生成。house、atmosphere、choice 已分别迁入外部文件，不再有对应内联定义。
 
 ### 顶层值、生命周期与公共/UI
 
 | 函数/变量 | 当前行 | 归属 |
 |---|---:|---|
-| `CHOICE_QUESTION_POOL` | 798 | choice 模块（04C-6 待迁移） |
-| `CHOICE_QUESTIONS_COUNT` | 832 | choice 模块（04C-6 待迁移） |
-| `ATMOSPHERE_ASSETS` | 837 | atmosphere 模块（04C-5 待迁移） |
-| `ATMOS_TAB_NAMES` | 885 | atmosphere 模块（04C-5 待迁移） |
-| `atmosCurrentTab` | 892 | atmosphere 模块（04C-5 待迁移） |
-| `atmosDragItem` | 893 | atmosphere 模块（04C-5 待迁移） |
-| `atmosDragOffset` | 894 | atmosphere 模块（04C-5 待迁移） |
-| `atmosCanvasScale` | 895 | atmosphere 模块（04C-5 待迁移） |
-| `atmosPinching` | 896 | atmosphere 模块（04C-5 待迁移） |
-| `_visibilityGuard` | 902 | 公共 UI |
-| `_exitModalTimer` | 903 | 公共 UI |
-| `DOMContentLoaded` | 905 | 生命周期与状态恢复 |
-| `MASCOT_QUOTES` | 1003 | 公共 UI |
-| `mascotTimers` | 1008 | 公共 UI |
-| `showMascotBubble` | 1009 | 公共 UI |
-| `toggleSettings` | 1033 | 设置面板 |
-| `saveApiKey` | 1046 | API 设置预留 UI |
-| `saveApiUrl` | 1052 | API 设置预留 UI |
-| `detectMoodTags` | 1058 | 退出弹窗依赖 |
-| `toggleCollapse` | 1074 | 通用折叠 |
+| `_visibilityGuard` | 803 | 公共 UI 状态 |
+| `_exitModalTimer` | 804 | 公共 UI 定时器 |
+| `DOMContentLoaded` 回调 | 806 | 登录、存储、模块恢复和音效初始化 |
+| `MASCOT_QUOTES` | 904 | 吉祥物短句 |
+| `mascotTimers` | 909 | 吉祥物气泡定时器 |
+| `showMascotBubble(el, type)` | 910 | 吉祥物气泡 |
+| `toggleSettings()` | 934 | 设置面板 |
+| `saveApiKey()` | 947 | API Key 预留 UI 的本地存取 |
+| `saveApiUrl()` | 953 | API URL 预留 UI 的本地存取 |
+| `detectMoodTags()` | 959 | 退出弹窗依赖 |
+| `toggleCollapse(id)` | 975 | 通用折叠 |
 
-### 氛围小屋值与函数（04C-5 待迁移）
-
-| 函数/变量 | 当前行 |
-|---|---:|
-| `switchAtmosTab` | 1084 |
-| `renderAtmosAssets` | 1093 |
-| `selectAtmosBg` | 1114 |
-| `selectAtmosBase` | 1124 |
-| `addAtmosFurniture` | 1133 |
-| `addAtmosCharacter` | 1158 |
-| `createAtmosItem` | 1180 |
-| `processAtmosImage` | 1200 |
-| `removeAtmosItem` | 1345 |
-| `updateAtmosPlaceholder` | 1357 |
-| `updateAtmosSelectedInfo` | 1363 |
-| `ATMOS_MOOD_TIPS` | 1376 |
-| `setupAtmosInteraction` | 1385 |
-| `initAtmosCanvasDeselect` | 1538 |
-| `applyAtmosCanvasScale` | 1551 |
-| `initAtmosCanvasZoom` | 1555 |
-| `completeAtmosphere` | 1603 |
-| `sampleAvgColor` | 1704 |
-| `analyzeAtmosphereChoices` | 1728 |
-| `buildAtmosphereInterpretation` | 1785 |
-| `showAtmosphereResult` | 1882 |
-| `initAtmosphere` | 1937 |
-
-### 此刻心意函数（04C-6 待迁移）
-
-| 函数 | 当前行 |
-|---|---:|
-| `initChoicePage` | 1983 |
-| `resumeChoice` | 1995 |
-| `startChoice` | 2003 |
-| `getChoiceQuestions` | 2023 |
-| `renderChoice` | 2029 |
-| `answerChoice` | 2054 |
-| `saveChoiceProgress` | 2068 |
-| `showChoiceResult` | 2074 |
-| `getChoiceComfortMessage` | 2158 |
-| `buildChoiceInterpretation` | 2194 |
+末尾第二个内联 script 位于 988～991 行，只注册首次 `touchstart` / `click` 的音频解锁监听器，没有顶层函数或变量定义。
 
 ---
 
 ## 9. 关键测试规范
 
-> 本节包含此前阶段留下的历史验收记录和后续测试规范。本节下述历史结果不得表述为本次测试；04C-4 最终浏览器功能、XSS、视口和资源回归已实际执行，证据见 `docs/TESTING.md`。本次文档同步没有重新跑浏览器。
+> 本节包含机械拆分阶段形成的测试规范。04C-4、04C-5、04C-6 和 04D 的实际执行证据见 `docs/TESTING.md`；本次最终文档同步没有重新运行浏览器测试。
 
 ### XSS 防护机制
 
@@ -538,8 +503,8 @@ index.html (HTML结构 + onclick)
     ├── soundfx.js ── SoundFX.* / updateSoundToggleUI() / toggleSoundSetting()
     ├── navigation.js ── navigateTo() / exitModule() / showExitModal() / closeExitModal() / confirmExit()
     │       └── 调用: detectMoodTags() (仍在index.html)
-    │       └── 调用: initAtmosphere() (将在04C-5迁移到atmosphere.js)
-    │       └── 调用: initChoicePage() (将在04C-6迁移到choice.js)
+    │       └── 调用: initAtmosphere() (atmosphere.js)
+    │       └── 调用: initChoicePage() (choice.js)
     ├── auth.js ── initLoginPage() / handleOAuthCallback() / checkLoginStatus()
     ├── journey.js ── renderArchive() / newJourney() / addStickerToArchive() / addStickerAndBack()
     ├── worry.js ── 10个函数
@@ -555,6 +520,14 @@ index.html (HTML结构 + onclick)
     │       ├── 调用: STATE.houseState / SoundFX.setMood()
     │       └── 动态按钮引用: toggleCollapse() / addStickerAndBack()
     │
+    ├── atmosphere.js ── 8 个顶层值 + 21 个氛围小屋函数
+    │       ├── 调用: STATE.atmosphereState / SoundFX.*
+    │       └── 动态按钮引用: toggleCollapse() / addStickerAndBack()
+    │
+    ├── choice.js ── 2 个常量 + 10 个此刻心意函数
+    │       ├── 调用: STATE.choiceState / saveToStorage() / SoundFX.*
+    │       └── 动态按钮引用: toggleCollapse() / addStickerAndBack()
+    │
     └── index.html 内联 script
             ├── DOMContentLoaded
             │       ├── initLoginPage() (auth.js)
@@ -566,37 +539,37 @@ index.html (HTML结构 + onclick)
             │       ├── updateSoundToggleUI() (soundfx.js)
             │       ├── renderFragments() (worry.js)
             │       ├── updateHousePreview() (house.js)
-            │       ├── initAtmosphere() (待迁移到atmosphere.js)
-            │       ├── initChoicePage() (待迁移到choice.js)
+            │       ├── initAtmosphere() (atmosphere.js)
+            │       ├── initChoicePage() (choice.js)
             │       └── SoundFX.setMood() (soundfx.js)
-            ├── 公共函数 (showMascotBubble, toggleSettings, detectMoodTags, toggleCollapse, ...)
-            ├── 氛围小屋函数 (04C-5 待迁移)
-            └── 此刻心意函数 (04C-6 待迁移)
+            └── 公共函数 (showMascotBubble, toggleSettings, saveApiKey, saveApiUrl, detectMoodTags, toggleCollapse)
 ```
 
 ---
 
 ## 11. 后续执行建议
 
-### 执行顺序
+### 已完成顺序
 
 ```
 04C-4: house.js (极简小屋，已完成并正式验收)
   ↓
-04C-5: atmosphere.js (氛围小屋，下一阶段尚未开始)
+04C-5: atmosphere.js (氛围小屋，已完成并通过双版本验收)
   ↓
-04C-6: choice.js (此刻心意)
+04C-6: choice.js (此刻心意，已完成并通过双版本验收)
   ↓
-04D: 最终整合 (common-ui.js + main.js 或保留内联)
+04D: 本地最终整合验收 (保留当前公共内联代码，FAIL=0、BLOCKED=0)
 ```
 
-### 每个模块的预期产出
+当前没有待执行的机械拆分阶段。后续工作应作为独立任务授权，可包括：已知状态与交互问题修复、真实 AI 接入前的安全和服务端架构、公共内联代码的进一步整理，或产品指标与评估体系。不得把这些建议视为已经开始。
 
-| 模块 | 新文件 | 预计行数 | 函数数 | 顶层变量 |
+### 各模块实际产出
+
+| 模块 | 新文件 | 当前行数 | 函数数 | 顶层值 |
 |------|--------|----------|--------|----------|
-| 04C-4 house | js/house.js | ~450 | 10 | 0 |
-| 04C-5 atmosphere | js/atmosphere.js | ~900 | 21 | 8 |
-| 04C-6 choice | js/choice.js | ~310 | 10 | 2 |
+| 04C-4 house | js/house.js | 442 | 10 | 0 |
+| 04C-5 atmosphere | js/atmosphere.js | 963 | 21 | 8 |
+| 04C-6 choice | js/choice.js | 382 | 10 | 2 |
 
 ### 提交命名规范
 
@@ -604,12 +577,10 @@ index.html (HTML结构 + onclick)
 04c4-house-extraction
 04c5-atmosphere-extraction
 04c6-choice-extraction
-04d-final-integration (如有)
+docs-final-modularization-handoff
 ```
 
-### 提交后预期 script 加载顺序
-
-完成 04C-6 后：
+### 当前 script 加载顺序
 
 ```
 state.js → xss.js → validation.js → storage.js → soundfx.js
@@ -622,7 +593,7 @@ state.js → xss.js → validation.js → storage.js → soundfx.js
 
 ## 12. 重要提醒
 
-1. **不要修改已拆分的 JS 文件**：state.js、storage.js、xss.js、validation.js、soundfx.js、navigation.js、auth.js、journey.js、worry.js、draw.js、house.js 在对应拆分阶段留有历史验收记录；本轮未重新执行这些测试。后续机械拆分默认不要修改这些文件。
+1. **不要在无明确任务时修改已拆分的 JS 文件**：state.js、xss.js、validation.js、storage.js、soundfx.js、navigation.js、auth.js、journey.js、worry.js、draw.js、house.js、atmosphere.js、choice.js 均已通过阶段验收。
 
 2. **HTML onclick 属性必须保留**：所有 `onclick="functionName()"` 是全局函数调用的入口，不能改为 addEventListener。
 
@@ -630,9 +601,9 @@ state.js → xss.js → validation.js → storage.js → soundfx.js
 
 4. **generateHouseSVG 是已迁移的大型函数**（约200行），生成完整的 SVG 字符串，包含大量硬编码的路径数据。04C-4 与 a0a0c50 基线逐字一致；后续不得借机械拆分修改。
 
-5. **buildChoiceInterpretation 是最长的心理学解读函数**（约130行），包含7个分析维度。迁移时必须逐字保持。
+5. **buildChoiceInterpretation 是较长的心理学解读函数**（约130行），包含7个分析维度；已迁入 `choice.js` 并与 793f3d5 基线保持一致。
 
-6. **navigation.js 中的 navigateTo() 调用了 initAtmosphere() 和 initChoicePage()**：这两个函数目前仍在 index.html 内联中。当 04C-5 和 04C-6 完成后，它们会移到 atmosphere.js 和 choice.js，navigateTo() 的调用不需要修改（因为全局函数在 script 加载后可用）。
+6. **navigation.js 中的 navigateTo() 调用了 initAtmosphere() 和 initChoicePage()**：两个函数现分别位于 `atmosphere.js` 和 `choice.js`；普通同步 script 的加载顺序保证调用可用。
 
 7. **localStorage 使用多个 key**：`soul_journey` 只保存 `archives`、`houseState`、`drawState`、`worryState`、`choiceState`；登录演示、音效和 API 设置还使用“本地存储事实”中列出的其他 key。机械拆分不得改变既有 key 或数据格式。
 
@@ -644,6 +615,6 @@ state.js → xss.js → validation.js → storage.js → soundfx.js
 
 11. **登录方式需要区分**：GitHub 和 Google 按钮会跳转到各自 OAuth 授权地址，回调地址配置为腾讯云开发函数；前端收到 `code` 后仅做演示提示，不交换 token，也不会自动登录。微信入口通过 `window.postMessage({ type: 'getWxLogin' })` 发起，并监听 `wxLoginSuccess` 消息，不是 OAuth 跳转。邮箱验证码由前端随机生成、写入 `localStorage` 并直接显示在提示框中，属于演示登录，不是服务端邮件认证。该项目本身没有后端服务器或数据库。
 
-12. **当前阶段与 KNOWN_ISSUE**：04C-4 已完成并正式验收，04C-5 尚未开始。HTML/STATE 的 `treehouse`、`igloo` 与部分安慰语/解读规则的 `tree`、`dome` 不一致，为拆分前既有问题，本阶段未修复。
+12. **当前阶段与 KNOWN_ISSUE**：04C-1～04C-6 均已完成，04D 本地最终整合验收通过。HTML/STATE 的 `treehouse`、`igloo` 与部分安慰语/解读规则的 `tree`、`dome` 不一致；`atmosphereState` 不持久化、`done` 不写入、再次进入清空家具和人物，并存在监听器与定时器清理风险。这些都是既有问题，模块化阶段未修复。
 
-13. **专题文档**：产品演进见 `docs/PRODUCT_EVOLUTION.md`，04C-4 本次实际验收数值见 `docs/TESTING.md`，提交级变更见 `CHANGELOG.md`。这些文件仅记录已确认事实与规划边界。
+13. **专题文档**：产品演进见 `docs/PRODUCT_EVOLUTION.md`，04C-4～04D 实际验收证据见 `docs/TESTING.md`，提交级变更见 `CHANGELOG.md`。这些文件仅记录已确认事实与规划边界。

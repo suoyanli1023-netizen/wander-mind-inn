@@ -2,10 +2,12 @@
 
 - 当前分支：feature/ai-product-v2
 - 交接前最后一个产品代码基线：5602e81（04c3-draw-extraction）
+- 最后一个产品代码提交：71078ef（04c6-choice-extraction）
 - 实际当前 HEAD 必须在每次任务开始时通过 git rev-parse --short HEAD 获取，不得只依赖本文档
-- 已完成至：04C-3 draw extraction
-- 下一阶段：04C-4 house extraction
-- 04C-4 尚未开始
+- 已完成：04C-4 house extraction、04C-5 atmosphere extraction、04C-6 choice extraction
+- 04D 本地最终整合验收已通过，产品测试 FAIL=0、BLOCKED=0
+- 当前不再有待执行的机械拆分阶段
+- 后续工作属于独立产品优化、真实 AI 接入或已知问题修复，必须单独授权
 
 # 修改规则
 
@@ -36,13 +38,10 @@
 - Safety Guard、Agent、心理内容库属于后续目标架构；
 - 不得把目标架构描述为已实现。
 
-# 04C-4 特别约束
+# 模块化封版约束
 
-- 只机械迁移极简小屋的 10 个函数；
-- 新文件目标为 js/house.js；
-- 只允许修改 index.html 和新增 js/house.js；
-- 保留 DOMContentLoaded 中的恢复逻辑；
-- 保留所有 house 相关 onclick；
-- generateHouseSVG 必须逐字保持；
-- 完成后必须与父提交执行逐函数比较；
-- 未获得用户确认前不得开始实施。
+- 13 个外部 JS 已完成拆分并通过阶段验收；无明确任务时默认禁止修改。
+- 已拆分文件：state、xss、validation、storage、soundfx、navigation、auth、journey、worry、draw、house、atmosphere、choice。
+- 所有静态及动态 onclick、DOMContentLoaded 初始化入口和普通同步 script 顺序必须保持兼容。
+- 不得将本地 04D 验收写成生产发布；远程状态必须以实际 Git 查询为准。
+- 已知问题不得顺带修复，须获得独立授权并单独验收。
