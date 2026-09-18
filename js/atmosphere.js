@@ -96,23 +96,27 @@ function renderAtmosAssets(cat) {
   }).join('');
 }
 
-function selectAtmosBg(path) {
+function selectAtmosBg(path, restoring = false) {
   SoundFX.select();
   STATE.atmosphereState.bg = path;
+  if (!restoring) STATE.atmosphereState.done = false;
   const layer = document.getElementById('atmos-layer-bg');
   layer.innerHTML = `<img src="${path}" alt="背景" style="width:100%;height:100%;object-fit:cover;">`;
   document.getElementById('atmosphere-canvas').classList.add('has-bg');
   updateAtmosPlaceholder();
   updateAtmosSelectedInfo();
+  if (!restoring) saveToStorage();
 }
 
-function selectAtmosBase(path) {
+function selectAtmosBase(path, restoring = false) {
   SoundFX.select();
   STATE.atmosphereState.base = path;
+  if (!restoring) STATE.atmosphereState.done = false;
   const layer = document.getElementById('atmos-layer-base');
   layer.innerHTML = `<img src="${path}" alt="小屋基底" style="width:100%;height:100%;object-fit:cover;">`;
   updateAtmosPlaceholder();
   updateAtmosSelectedInfo();
+  if (!restoring) saveToStorage();
 }
 
 function addAtmosFurniture(path) {
@@ -135,9 +139,11 @@ function addAtmosFurniture(path) {
   const el = createAtmosItem('furniture-item', id, path, pos.x, pos.y, pos.w, '家具');
   layer.appendChild(el);
   STATE.atmosphereState.furniture.push({ id, path, x: pos.x, y: pos.y, w: pos.w });
+  STATE.atmosphereState.done = false;
   setupAtmosInteraction(el);
   updateAtmosSelectedInfo();
   processAtmosImage(el.querySelector('img'));
+  saveToStorage();
 }
 
 function addAtmosCharacter(path) {
@@ -156,9 +162,11 @@ function addAtmosCharacter(path) {
   const el = createAtmosItem('character-item', id, path, pos.x, pos.y, pos.w, '人物');
   layer.appendChild(el);
   STATE.atmosphereState.characters.push({ id, path, x: pos.x, y: pos.y, w: pos.w });
+  STATE.atmosphereState.done = false;
   setupAtmosInteraction(el);
   updateAtmosSelectedInfo();
   processAtmosImage(el.querySelector('img'));
+  saveToStorage();
 }
 
 // 创建氛围小屋元素（统一构造）
@@ -336,7 +344,9 @@ function removeAtmosItem(id) {
   } else if (id.startsWith('char_')) {
     STATE.atmosphereState.characters = STATE.atmosphereState.characters.filter(i => i.id !== id);
   }
+  STATE.atmosphereState.done = false;
   updateAtmosSelectedInfo();
+  saveToStorage();
 }
 
 function updateAtmosPlaceholder() {
@@ -489,10 +499,17 @@ function setupAtmosInteraction(el) {
   function onPointerUp() {
     if (!mode) return;
     const wasResize = mode && mode.indexOf('resize') === 0;
+    const changed = parseFloat(el.style.left) !== startLeft ||
+      parseFloat(el.style.top) !== startTop ||
+      (wasResize && parseFloat(el.style.width) !== startW);
     mode = null;
     atmosDragItem = null;
     el.style.zIndex = '';
     syncState(wasResize);
+    if (changed) {
+      STATE.atmosphereState.done = false;
+      saveToStorage();
+    }
   }
 
   el.addEventListener('mousedown', onPointerDown);
@@ -680,6 +697,8 @@ function completeAtmosphere() {
     canvas.classList.remove('animating');
     SoundFX.complete();
     showAtmosphereResult();
+    STATE.atmosphereState.done = true;
+    saveToStorage();
   }, totalDelay);
 }
 
@@ -926,6 +945,8 @@ function initAtmosphere() {
   canvas.classList.remove('animating');
   const layerBg = document.getElementById('atmos-layer-bg');
   const layerBase = document.getElementById('atmos-layer-base');
+  const layerFurniture = document.getElementById('atmos-layer-furniture');
+  const layerCharacter = document.getElementById('atmos-layer-character');
   layerBg.classList.remove('anim-zoom', 'show');
   layerBase.classList.remove('anim-hidden', 'show');
   canvas.querySelectorAll('.anim-hidden, .anim-show').forEach(el => {
@@ -936,6 +957,9 @@ function initAtmosphere() {
     el.classList.remove('show');
   });
   document.getElementById('atmos-anim-overlay').classList.remove('show');
+  const resultDiv = document.getElementById('atmosphere-result');
+  resultDiv.classList.add('hidden');
+  resultDiv.innerHTML = '';
   // 初始化取消选中
   initAtmosCanvasDeselect();
   // 初始化画布缩放（滚轮 + 双指），并重置缩放比例
@@ -944,19 +968,32 @@ function initAtmosphere() {
   atmosPinching = false;
   initAtmosCanvasZoom();
   // 恢复背景
+  layerBg.innerHTML = '';
+  canvas.classList.remove('has-bg');
   if (state.bg) {
-    selectAtmosBg(state.bg);
+    selectAtmosBg(state.bg, true);
   }
   // 恢复基底
+  layerBase.innerHTML = '';
   if (state.base) {
-    selectAtmosBase(state.base);
+    selectAtmosBase(state.base, true);
   }
   // 恢复家具
-  document.getElementById('atmos-layer-furniture').innerHTML = '';
-  document.getElementById('atmos-layer-character').innerHTML = '';
-  STATE.atmosphereState.furniture = [];
-  STATE.atmosphereState.characters = [];
+  layerFurniture.innerHTML = '';
+  layerCharacter.innerHTML = '';
   // 重新添加（从保存的状态）
+  state.furniture.forEach(item => {
+    const el = createAtmosItem('furniture-item', item.id, item.path, item.x, item.y, item.w, '家具');
+    layerFurniture.appendChild(el);
+    setupAtmosInteraction(el);
+    processAtmosImage(el.querySelector('img'));
+  });
+  state.characters.forEach(item => {
+    const el = createAtmosItem('character-item', item.id, item.path, item.x, item.y, item.w, '人物');
+    layerCharacter.appendChild(el);
+    setupAtmosInteraction(el);
+    processAtmosImage(el.querySelector('img'));
+  });
   updateAtmosPlaceholder();
   updateAtmosSelectedInfo();
   switchAtmosTab('backgrounds');
