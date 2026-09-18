@@ -61,6 +61,42 @@ let atmosDragItem = null;
 let atmosDragOffset = { x: 0, y: 0 };
 let atmosCanvasScale = 1;      // 小屋画布当前缩放比例（0.5 ~ 2）
 let atmosPinching = false;     // 是否正在双指缩放画布
+const atmosInteractionCleanups = new Map();
+const atmosAnimationTimers = new Set();
+let atmosCanvasDeselectCleanup = null;
+let atmosCanvasZoomCleanup = null;
+
+function scheduleAtmosTimer(callback, delay) {
+  const timer = setTimeout(() => {
+    atmosAnimationTimers.delete(timer);
+    callback();
+  }, delay);
+  atmosAnimationTimers.add(timer);
+  return timer;
+}
+
+function clearAtmosAnimationTimers() {
+  atmosAnimationTimers.forEach(timer => clearTimeout(timer));
+  atmosAnimationTimers.clear();
+}
+
+function cleanupAtmosInteraction(el) {
+  const cleanup = atmosInteractionCleanups.get(el);
+  if (cleanup) cleanup();
+}
+
+function cleanupAtmosInteractions() {
+  [...atmosInteractionCleanups.values()].forEach(cleanup => cleanup());
+}
+
+function cleanupAtmosphere() {
+  clearAtmosAnimationTimers();
+  cleanupAtmosInteractions();
+  if (atmosCanvasDeselectCleanup) atmosCanvasDeselectCleanup();
+  if (atmosCanvasZoomCleanup) atmosCanvasZoomCleanup();
+  atmosDragItem = null;
+  atmosPinching = false;
+}
 
 
 // =============================================================
@@ -338,6 +374,7 @@ function processAtmosImage(imgEl) {
 function removeAtmosItem(id) {
   const el = document.getElementById(id);
   if (!el) return;
+  cleanupAtmosInteraction(el);
   el.remove();
   if (id.startsWith('furn_')) {
     STATE.atmosphereState.furniture = STATE.atmosphereState.furniture.filter(i => i.id !== id);
@@ -378,6 +415,7 @@ const ATMOS_MOOD_TIPS = [
   '它把温柔藏在细节里',
 ];
 function setupAtmosInteraction(el) {
+  cleanupAtmosInteraction(el);
   // mode: null | 'drag' | 'resize-tl' | 'resize-tr' | 'resize-bl' | 'resize-br'
   let mode = null;
   let startX = 0, startY = 0, startLeft = 0, startTop = 0, startW = 0;
@@ -522,31 +560,66 @@ function setupAtmosInteraction(el) {
 
   // 悬浮温柔情绪提示
   let tipTimer = null;
-  el.addEventListener('mouseenter', function() {
+  function onMouseEnter() {
     if (!tipEl) return;
-    if (tipTimer) clearTimeout(tipTimer);
-    tipTimer = setTimeout(() => {
+    if (tipTimer) {
+      clearTimeout(tipTimer);
+      atmosAnimationTimers.delete(tipTimer);
+    }
+    tipTimer = scheduleAtmosTimer(() => {
+      tipTimer = null;
       tipEl.textContent = ATMOS_MOOD_TIPS[Math.floor(Math.random() * ATMOS_MOOD_TIPS.length)];
       tipEl.classList.add('show');
     }, 350);
-  });
-  el.addEventListener('mouseleave', function() {
-    if (tipTimer) { clearTimeout(tipTimer); tipTimer = null; }
+  }
+  function onMouseLeave() {
+    if (tipTimer) {
+      clearTimeout(tipTimer);
+      atmosAnimationTimers.delete(tipTimer);
+      tipTimer = null;
+    }
     if (tipEl) tipEl.classList.remove('show');
-  });
+  }
+  el.addEventListener('mouseenter', onMouseEnter);
+  el.addEventListener('mouseleave', onMouseLeave);
+
+  const cleanup = () => {
+    el.removeEventListener('mousedown', onPointerDown);
+    el.removeEventListener('touchstart', onPointerDown, { passive: false });
+    document.removeEventListener('mousemove', onPointerMove);
+    document.removeEventListener('touchmove', onPointerMove, { passive: false });
+    document.removeEventListener('mouseup', onPointerUp);
+    document.removeEventListener('touchend', onPointerUp);
+    document.removeEventListener('touchcancel', onPointerUp);
+    el.removeEventListener('mouseenter', onMouseEnter);
+    el.removeEventListener('mouseleave', onMouseLeave);
+    if (tipTimer) {
+      clearTimeout(tipTimer);
+      atmosAnimationTimers.delete(tipTimer);
+      tipTimer = null;
+    }
+    if (atmosDragItem === el) atmosDragItem = null;
+    atmosInteractionCleanups.delete(el);
+  };
+  atmosInteractionCleanups.set(el, cleanup);
 }
 
 // 点击画布空白处取消选中
 function initAtmosCanvasDeselect() {
   const canvas = document.getElementById('atmosphere-canvas');
-  if (!canvas) return;
-  canvas.addEventListener('mousedown', function(e) {
+  if (!canvas || atmosCanvasDeselectCleanup) return;
+  function onCanvasMouseDown(e) {
     // 只在点击画布本身或非交互层时取消选中
     if (e.target === canvas || e.target.classList.contains('layer-bg') ||
         e.target.classList.contains('layer-base') || e.target.classList.contains('atmosphere-canvas-placeholder')) {
       canvas.querySelectorAll('.selected').forEach(s => s.classList.remove('selected'));
     }
-  });
+  }
+  canvas.addEventListener('mousedown', onCanvasMouseDown);
+  atmosCanvasDeselectCleanup = () => {
+    canvas.removeEventListener('mousedown', onCanvasMouseDown);
+    atmosCanvasDeselectCleanup = null;
+  };
 }
 
 // 画布缩放：鼠标滚轮 + 双指触控（范围 0.5x ~ 2x）
@@ -556,21 +629,22 @@ function applyAtmosCanvasScale() {
 }
 function initAtmosCanvasZoom() {
   const canvas = document.getElementById('atmosphere-canvas');
-  if (!canvas || canvas._atmosZoomInit) return;
+  if (!canvas || canvas._atmosZoomInit || atmosCanvasZoomCleanup) return;
   canvas._atmosZoomInit = true;
 
   // 鼠标滚轮缩放
-  canvas.addEventListener('wheel', function(e) {
+  function onCanvasWheel(e) {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
     atmosCanvasScale = Math.max(0.5, Math.min(2, +(atmosCanvasScale + delta).toFixed(2)));
     applyAtmosCanvasScale();
-  }, { passive: false });
+  }
+  canvas.addEventListener('wheel', onCanvasWheel, { passive: false });
 
   // 双指触控缩放
   let pinchStartDist = 0;
   let pinchStartScale = 1;
-  canvas.addEventListener('touchstart', function(e) {
+  function onCanvasTouchStart(e) {
     if (e.touches.length === 2) {
       atmosPinching = true;
       const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -578,8 +652,8 @@ function initAtmosCanvasZoom() {
       pinchStartDist = Math.hypot(dx, dy) || 1;
       pinchStartScale = atmosCanvasScale;
     }
-  }, { passive: true });
-  canvas.addEventListener('touchmove', function(e) {
+  }
+  function onCanvasTouchMove(e) {
     if (e.touches.length === 2 && atmosPinching) {
       e.preventDefault();
       const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -591,15 +665,29 @@ function initAtmosCanvasZoom() {
         applyAtmosCanvasScale();
       }
     }
-  }, { passive: false });
-  canvas.addEventListener('touchend', function(e) {
+  }
+  function onCanvasTouchEnd(e) {
     if (e.touches.length < 2) {
       atmosPinching = false;
     }
-  }, { passive: true });
-  canvas.addEventListener('touchcancel', function() {
+  }
+  function onCanvasTouchCancel() {
     atmosPinching = false;
-  }, { passive: true });
+  }
+  canvas.addEventListener('touchstart', onCanvasTouchStart, { passive: true });
+  canvas.addEventListener('touchmove', onCanvasTouchMove, { passive: false });
+  canvas.addEventListener('touchend', onCanvasTouchEnd, { passive: true });
+  canvas.addEventListener('touchcancel', onCanvasTouchCancel, { passive: true });
+  atmosCanvasZoomCleanup = () => {
+    canvas.removeEventListener('wheel', onCanvasWheel, { passive: false });
+    canvas.removeEventListener('touchstart', onCanvasTouchStart, { passive: true });
+    canvas.removeEventListener('touchmove', onCanvasTouchMove, { passive: false });
+    canvas.removeEventListener('touchend', onCanvasTouchEnd, { passive: true });
+    canvas.removeEventListener('touchcancel', onCanvasTouchCancel, { passive: true });
+    canvas._atmosZoomInit = false;
+    atmosPinching = false;
+    atmosCanvasZoomCleanup = null;
+  };
 }
 
 function completeAtmosphere() {
@@ -610,6 +698,7 @@ function completeAtmosphere() {
     return;
   }
 
+  clearAtmosAnimationTimers();
   const canvas = document.getElementById('atmosphere-canvas');
   const layerBg = document.getElementById('atmos-layer-bg');
   const layerBase = document.getElementById('atmos-layer-base');
@@ -639,11 +728,11 @@ function completeAtmosphere() {
   animText.textContent = '远方，一片温柔的风景…';
   SoundFX.animBg();
 
-  setTimeout(() => {
+  scheduleAtmosTimer(() => {
     if (bg) {
       layerBg.classList.add('anim-zoom');
       void layerBg.offsetWidth;
-      setTimeout(() => {
+      scheduleAtmosTimer(() => {
         layerBg.classList.add('show');
         overlay.classList.remove('show');
       }, 100);
@@ -654,7 +743,7 @@ function completeAtmosphere() {
   }, 600);
 
   // Phase 2: 镜头推进到小屋基底
-  setTimeout(() => {
+  scheduleAtmosTimer(() => {
     animText.textContent = '小屋渐渐清晰…';
     SoundFX.animBase();
     if (base) {
@@ -664,10 +753,10 @@ function completeAtmosphere() {
   }, 2000);
 
   // Phase 3: 家具逐个浮现
-  setTimeout(() => {
+  scheduleAtmosTimer(() => {
     const furnItems = layerFurn.querySelectorAll('.furniture-item');
     furnItems.forEach((el, idx) => {
-      setTimeout(() => {
+      scheduleAtmosTimer(() => {
         el.classList.remove('anim-hidden');
         el.classList.add('anim-show');
       }, idx * 200);
@@ -676,10 +765,10 @@ function completeAtmosphere() {
 
   // Phase 4: 人物浮现
   const furnDelay = furniture.length * 200 + 500;
-  setTimeout(() => {
+  scheduleAtmosTimer(() => {
     const charItems = layerChar.querySelectorAll('.character-item');
     charItems.forEach((el, idx) => {
-      setTimeout(() => {
+      scheduleAtmosTimer(() => {
         el.classList.remove('anim-hidden');
         el.classList.add('anim-show');
       }, idx * 250);
@@ -693,7 +782,7 @@ function completeAtmosphere() {
 
   // Phase 5: 显示结果文案
   const totalDelay = 3200 + furnDelay + characters.length * 250 + 800;
-  setTimeout(() => {
+  scheduleAtmosTimer(() => {
     canvas.classList.remove('animating');
     SoundFX.complete();
     showAtmosphereResult();
@@ -939,6 +1028,7 @@ function showAtmosphereResult() {
 }
 
 function initAtmosphere() {
+  cleanupAtmosphere();
   const state = STATE.atmosphereState;
   // 清除动画状态
   const canvas = document.getElementById('atmosphere-canvas');

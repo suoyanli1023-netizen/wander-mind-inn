@@ -2,6 +2,9 @@
 // 页面导航
 // =============================================================
 function navigateTo(pageId) {
+  if (STATE.currentPage === 'page-atmosphere' && pageId !== 'page-atmosphere' && typeof cleanupAtmosphere === 'function') {
+    cleanupAtmosphere();
+  }
   SoundFX.pageTransition();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(pageId).classList.add('active');
