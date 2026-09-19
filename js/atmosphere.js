@@ -162,13 +162,13 @@ function addAtmosFurniture(path) {
   // 真实生活场景默认位置：家具靠墙摆放，底部对齐，模拟真实房间布局
   const furniturePositions = [
     { x: 8, y: 48, w: 110 },   // 左侧靠墙 - 柜子/书架位
-    { x: 72, y: 48, w: 110 },  // 右侧靠墙 - 柜子/书架位
+    { x: 55, y: 48, w: 110 },  // 右侧靠墙 - 柜子/书架位
     { x: 38, y: 55, w: 100 },  // 中央偏下 - 桌子/沙发位
     { x: 20, y: 42, w: 85 },   // 左中 - 椅子/小柜
     { x: 62, y: 42, w: 85 },   // 右中 - 椅子/小柜
     { x: 45, y: 30, w: 75 },   // 中上偏后 - 装饰柜
     { x: 5, y: 58, w: 95 },    // 左下角 - 地面家具
-    { x: 76, y: 58, w: 95 },   // 右下角 - 地面家具
+    { x: 60, y: 58, w: 95 },   // 右下角 - 地面家具
   ];
   const idx = STATE.atmosphereState.furniture.length;
   const pos = furniturePositions[idx % furniturePositions.length];
@@ -178,6 +178,7 @@ function addAtmosFurniture(path) {
   STATE.atmosphereState.done = false;
   setupAtmosInteraction(el);
   updateAtmosSelectedInfo();
+  fitNewAtmosItemInCanvas(el, STATE.atmosphereState.furniture[STATE.atmosphereState.furniture.length - 1]);
   processAtmosImage(el.querySelector('img'));
   saveToStorage();
 }
@@ -201,8 +202,29 @@ function addAtmosCharacter(path) {
   STATE.atmosphereState.done = false;
   setupAtmosInteraction(el);
   updateAtmosSelectedInfo();
+  fitNewAtmosItemInCanvas(el, STATE.atmosphereState.characters[STATE.atmosphereState.characters.length - 1]);
   processAtmosImage(el.querySelector('img'));
   saveToStorage();
+}
+
+function fitNewAtmosItemInCanvas(el, item) {
+  const img = el.querySelector('img');
+  const fit = () => {
+    const canvas = document.getElementById('atmosphere-canvas');
+    if (!canvas || !el.isConnected) return;
+    const maxX = Math.max(0, (canvas.clientWidth - el.offsetWidth) / canvas.clientWidth * 100);
+    const maxY = Math.max(0, (canvas.clientHeight - el.offsetHeight) / canvas.clientHeight * 100);
+    const nextX = Math.min(item.x, maxX);
+    const nextY = Math.min(item.y, maxY);
+    if (nextX === item.x && nextY === item.y) return;
+    item.x = +nextX.toFixed(4);
+    item.y = +nextY.toFixed(4);
+    el.style.left = item.x + '%';
+    el.style.top = item.y + '%';
+    saveToStorage();
+  };
+  if (img.complete && img.naturalWidth > 0) fit();
+  else img.addEventListener('load', fit, { once: true });
 }
 
 // 创建氛围小屋元素（统一构造）
