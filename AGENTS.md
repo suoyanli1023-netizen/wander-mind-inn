@@ -2,12 +2,15 @@
 
 - 当前分支：feature/ai-product-v2
 - 交接前最后一个产品代码基线：5602e81（04c3-draw-extraction）
-- 最后一个产品代码提交：71078ef（04c6-choice-extraction）
+- 最后一个产品代码提交：bfeffb0（fix-atmosphere-mobile-default-placement）
 - 实际当前 HEAD 必须在每次任务开始时通过 git rev-parse --short HEAD 获取，不得只依赖本文档
 - 已完成：04C-4 house extraction、04C-5 atmosphere extraction、04C-6 choice extraction
 - 04D 本地最终整合验收已通过，产品测试 FAIL=0、BLOCKED=0
+- 05A-1 极简小屋基底映射、05A-2 氛围状态持久化、05A-3 氛围生命周期清理及 320px 默认位置修复均已完成
+- 05A 稳定性最终验收已通过，产品测试 FAIL=0、BLOCKED=0
+- 当前没有正在进行的修复任务
 - 当前不再有待执行的机械拆分阶段
-- 后续工作属于独立产品优化、真实 AI 接入或已知问题修复，必须单独授权
+- 后续真实 AI、服务端、安全或新产品能力必须单独授权
 
 # 修改规则
 

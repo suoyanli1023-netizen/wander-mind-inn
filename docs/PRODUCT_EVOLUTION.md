@@ -35,6 +35,11 @@
 | 氛围小屋仍在主内联脚本，画布交互难以独立审查 | 将 8 个顶层值、21 个函数和注释按真实顺序迁入 `js/atmosphere.js`，保留全局调用和初始化入口 | 素材、Mouse/Touch/Wheel、Canvas、动画、结果与贴纸流程保持原样；双版本验收 FAIL=0、BLOCKED=0 | `793f3d5 04c5-atmosphere-extraction` |
 | 此刻心意仍在主内联脚本，题库和进度逻辑与公共 UI 混合 | 将 2 个常量、10 个函数和注释迁入 `js/choice.js`，保留随机题序、恢复和存储格式 | 十题、中断、继续、刷新、结果和贴纸流程保持原样；双版本验收 FAIL=0、BLOCKED=0 | `71078ef 04c6-choice-extraction` |
 | 分阶段通过后仍需验证完整产品闭环 | 在干净 `71078ef` 上执行 04D 本地最终整合验收 | 五模块同一旅程贴纸闭环、刷新、XSS、七视口、资源和运行时全部通过，FAIL=0、BLOCKED=0 | 无产品代码提交 |
+| `treehouse` / `igloo` 无法命中旧 `tree` / `dome` 解读分支 | 以真实 HTML 与 STATE 输入值为准，只修正 `js/house.js` 的映射条件 | 三种基底均得到对应 SVG、安慰语和专业解读；其余体验不变 | `a1d021d fix-house-base-value-mapping` |
+| 氛围场景刷新或重进后丢失，完成状态未写入 | 将纯数据 `atmosphereState` 纳入 `soul_journey`，按稳定交互节点保存并兼容旧数据 | 用户可继续编辑已保存场景；`done` 在完成与再次编辑之间正确转换 | `13406c4 fix-atmosphere-state-persistence` |
+| 动态元素监听器和完成动画 timer 可能在删除、重建或退出后残留 | 建立可撤销监听注册表与 timer 集合，在统一导航边界清理 | 反复进入、拖拽、完成或中途退出不再累积临时副作用 | `d8b4edd fix-atmosphere-lifecycle-cleanup` |
+| 320px 画布中右侧及高图片默认位置可能裁切 | 调整右侧模板，并仅对新元素按实际渲染尺寸夹取坐标；不改已有场景 | 七视口 35 个默认元素循环均完整可见，横向溢出为 0 | `bfeffb0 fix-atmosphere-mobile-default-placement` |
+| 05A 修复需整体验证状态、交互和跨模块稳定性 | 从空 profile 执行五模块、兼容数据、生命周期、XSS、七视口、资源与运行时门禁 | FAIL=0、BLOCKED=0；形成进入真实 AI 架构阶段前的稳定前端基线 | 无额外产品代码提交 |
 
 两个质量问题在 `a0a0c50` 拆分前基线同样存在，独立修复没有改变 house 函数源码。完整实测数值见 `docs/TESTING.md`。
 
@@ -42,9 +47,9 @@
 
 真实前端架构是原生 `index.html`、11 个独立 CSS、13 个普通同步外部 JS 和 2 个内联 script。journey、worry、draw、house、atmosphere、choice 均已拆分；主内联 script 只保留生命周期、状态恢复、吉祥物、设置、情绪标签和折叠等公共代码。
 
-`soul_journey` 只保存 `archives`、`houseState`、`drawState`、`worryState`、`choiceState`。登录演示、音效、API 设置使用其他 localStorage key。GitHub/Google 只有授权跳转与演示回调；微信使用 postMessage；邮箱验证码由前端生成和显示。前端 API Key 输入仅为预留 UI。**AI Gateway、Safety Guard、Agent 和服务端数据库均未实现。**
+`soul_journey` 保存 `archives`、`houseState`、`atmosphereState`、`drawState`、`worryState`、`choiceState`。登录演示、音效、API 设置使用其他 localStorage key。GitHub/Google 只有授权跳转与演示回调；微信使用 postMessage；邮箱验证码由前端生成和显示。前端 API Key 输入仅为预留 UI。**AI Gateway、Safety Guard、Agent 和服务端数据库均未实现。**
 
-当前已经实现并通过本地整合验收的产品能力包括：演示登录、旅程新建／重命名／删除、五个情绪互动模块、结果承接与本地规则解读、五类情绪贴纸、部分模块进度与音效偏好的本地持久化、XSS 文本安全显示、移动与桌面响应式页面。04D 实际在同一旅程中生成五类贴纸，并验证删除、刷新和继续使用。这里的“通过”指本地产品验收，不表示已经生产上线。
+当前已经实现并通过本地整合验收的产品能力包括：演示登录、旅程新建／重命名／删除、五个情绪互动模块、结果承接与本地规则解读、五类情绪贴纸、各核心模块进度与音效偏好的本地持久化、XSS 文本安全显示、移动与桌面响应式页面。05A 进一步完成基底映射、氛围状态一致性、生命周期治理和移动端默认放置；这里的“通过”指本地与测试环境验收，不表示已经生产上线。
 
 ## 7. AI 产品目标架构（规划中）
 
@@ -59,14 +64,12 @@
 
 落地这些能力前，需要独立设计数据边界、服务端密钥管理、内容安全与评估方法。
 
-## 8. 当前已知问题与边界
+## 8. 当前产品成熟度、已知边界与未实现能力
 
-- `treehouse` / `igloo` 是 HTML 与 STATE 的基底值，部分安慰语和解读规则却使用 `tree` / `dome`；这是既有映射问题，04C-4 未修复。
-- `atmosphereState` 不进入 `soul_journey`；氛围小屋能显示结果，但 `done` 未被写为 `true`。
-- 氛围小屋再次进入会清空家具和人物；重复监听器与未清理定时器存在长期交互风险。
+- 模块化治理、体验修复、状态一致性、生命周期治理和自动化质量门禁已经形成稳定前端基线；05A 最终验收 FAIL=0、BLOCKED=0。
 - 认证仍是演示流程，不具备生产级服务端身份验证。
 - API Key 设置是前端预留 UI，不能视为真实 AI 接入。
-- 没有真实 AI 请求、服务端 AI Gateway 或数据库。
+- 没有真实 AI 请求、Agent、Safety Guard、服务端 AI Gateway 或数据库。
 
 ## 9. 后续产品迭代建议
 
@@ -79,11 +82,10 @@
 - 建立 Safety Guard、危机场景转介、输出结构约束、降级策略和人工内容审核标准。
 - 区分本地规则反馈与 AI 生成内容，避免把心理联想呈现为诊断。
 
-### P1：已知状态与交互问题
+### P1：状态、交互和可维护性
 
-- 单独修复 `treehouse/igloo` 与 `tree/dome` 映射，并建立基线回归。
-- 明确 atmosphere 是否需要持久化及 `done` 的语义，再统一刷新、再次进入和保存行为。
-- 为氛围小屋监听器和定时器建立幂等初始化及退出清理。
+- 持续为已持久化场景建立 schema 演进策略、容量边界和异常数据观测。
+- 补充键盘可访问性、触摸设备人工兼容矩阵和低性能设备动画评估。
 - 将演示认证与生产认证在界面和代码边界上清楚分离。
 
 ### P2：指标、评估和增长实验

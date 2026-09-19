@@ -44,7 +44,7 @@ project-root/
 ├── CHANGELOG.md            提交级变更记录
 ├── docs/
 │   ├── PRODUCT_EVOLUTION.md 产品演进记录
-│   └── TESTING.md           04C-4～04D 实际验收证据
+│   └── TESTING.md           04C-4～05A 实际验收证据
 ├── css/
 │   ├── variables.css       CSS变量定义
 │   ├── global.css          全局样式
@@ -62,15 +62,15 @@ project-root/
 │   ├── utils/
 │   │   ├── xss.js          escapeHtml函数(16行)
 │   │   └── validation.js   truncateUnicode函数(8行)
-│   ├── storage.js          localStorage读写(39行)
+│   ├── storage.js          localStorage读写(55行)
 │   ├── soundfx.js          音效系统(85行)
-│   ├── navigation.js       页面导航+退出弹窗(59行)
+│   ├── navigation.js       页面导航+退出弹窗(62行)
 │   ├── auth.js             GitHub/Google OAuth 演示、微信 postMessage、邮箱演示登录(211行)
 │   ├── journey.js          旅程管理+贴纸(171行)
 │   ├── worry.js            放走坏心情模块(225行)
 │   ├── draw.js             绘画投射模块(534行)
 │   ├── house.js            极简小屋模块（442行、10个函数）
-│   ├── atmosphere.js       氛围小屋模块（963行、8个顶层值、21个函数）
+│   ├── atmosphere.js       氛围小屋模块（1112行；含状态恢复与生命周期治理）
 │   └── choice.js           此刻心意模块（382行、2个常量、10个函数）
 ├── assets/
 │   ├── audio/              14个 WAV 音效文件
@@ -129,7 +129,7 @@ const STATE = window.STATE = {
 
 ### 本地存储事实
 
-- `js/storage.js` 的 `soul_journey` 只序列化 `archives`、`houseState`、`drawState`、`worryState`、`choiceState` 五个字段；它不保存 `currentJourneyId`、`atmosphereState`、`currentPage` 或 `originalTitle`，因此不能描述为“整个 STATE”。
+- `js/storage.js` 的 `soul_journey` 序列化 `archives`、`houseState`、`atmosphereState`、`drawState`、`worryState`、`choiceState` 六个字段；它不保存 `currentJourneyId`、`currentPage` 或 `originalTitle`，因此不能描述为“整个 STATE”。缺少 `atmosphereState` 的旧数据保留默认值；缺失或类型异常的家具、人物数组降级为空数组；数组中的异常记录会被过滤。
 - `js/auth.js` 还使用 `login_user_id`、`login_nickname`、`login_provider`、`login_time`、`email_code`、`email_address`、`user_openid`。
 - `js/soundfx.js` 使用 `sound_enabled`；`index.html` 的设置面板使用 `api_key`、`api_url`。
 
@@ -154,7 +154,12 @@ const STATE = window.STATE = {
 ## 4. Git 提交历史
 
 ```
-71078ef  04c6-choice-extraction       ← 最后一个产品代码提交
+bfeffb0  fix-atmosphere-mobile-default-placement  ← 05A 稳定性验收时最后产品代码提交
+d8b4edd  fix-atmosphere-lifecycle-cleanup
+13406c4  fix-atmosphere-state-persistence
+a1d021d  fix-house-base-value-mapping
+84bcac3  docs-final-modularization-handoff
+71078ef  04c6-choice-extraction       ← 模块化阶段最后产品代码提交
 793f3d5  04c5-atmosphere-extraction
 0eeb114  docs-04c4-product-and-engineering-update
 2fb8a7e  fix-house-mobile-tooltip-overflow  ← 04C-4 正式关闭时的最后产品代码提交
@@ -176,7 +181,7 @@ d9455ea  04a-css-modularization
 
 分支：`feature/ai-product-v2`
 
-> **注意**：交接前最后产品代码提交为 5602e81；04C-4 正式关闭时的最后产品代码提交为 2fb8a7e；模块化阶段最后产品代码提交为 71078ef。它们是阶段基线，不是永久“当前 HEAD”。每次任务开始须以真实 `git rev-parse --short HEAD` 为准。
+> **注意**：交接前最后产品代码提交为 5602e81；04C-4 正式关闭时为 2fb8a7e；模块化阶段最后产品代码提交为 71078ef；05A 稳定性验收时最后产品代码提交为 bfeffb0。它们是阶段基线，不是永久“当前 HEAD”。每次任务开始须以真实 `git rev-parse --short HEAD` 为准。
 
 ---
 
@@ -265,9 +270,17 @@ d9455ea  04a-css-modularization
 - `2fb8a7e`：在 `css/responsive.css` 为 480px 以下装饰提示框设 120px 宽并允许换行，原 390×844 的 9px 横向溢出已消失。
 - 两项问题在 a0a0c50 拆分前基线同样存在，并非 house.js 引入。04C-4 完整实测见 `docs/TESTING.md`；最终 FAIL=0、BLOCKED=0。
 
+### 阶段 05A：模块化封版后的稳定性修复
+
+- [x] **05A-1 `a1d021d`**：将 house 解读中的旧 `tree` / `dome` 分支改为真实输入值 `treehouse` / `igloo`；三种基底均命中对应 SVG、安慰语和专业解读。
+- [x] **05A-2 `13406c4`**：将 `atmosphereState` 纳入 `soul_journey`，兼容旧数据与异常记录；背景、基底、家具、人物、位置、尺寸和 `done` 可刷新恢复，再次进入不再清空场景。
+- [x] **05A-3 `d8b4edd`**：为动态元素、画布监听器及完成动画 timer 建立可重复清理的生命周期；离开氛围页后临时监听器和 timer 归零，无迟到结果或音效。
+- [x] **移动端默认位置 `bfeffb0`**：修正右侧默认模板，并仅对新添加元素按实际图片尺寸夹取到画布范围内；已持久化坐标与用户拖动坐标不改写。七个视口、35 个默认元素循环实测无裁切。
+- [x] **05A 最终验收**：完整五模块、五类贴纸、存储兼容、三种基底、状态转换、监听器与 timer、XSS、七视口、资源和运行时全部通过，FAIL=0、BLOCKED=0；不代表生产发布。
+
 ---
 
-## 7. 04C-4～04D 完成状态与模块边界
+## 7. 04C-4～05A 完成状态与模块边界
 
 > **04C-4、04C-5、04C-6 和 04D 本地最终整合验收均已完成。当前没有待执行的机械拆分阶段。** 后续产品优化、真实 AI 接入或已知问题修复须单独授权。
 
@@ -315,11 +328,11 @@ d9455ea  04a-css-modularization
 
 这 10 个极简小屋函数不直接调用 `SoundFX.click()`、`SoundFX.complete()`、`navigateTo()`、`escapeHtml()` 或 `saveToStorage()`。页面导航、持久化等行为可能在外围流程发生，但不应列为这 10 个函数的直接依赖。
 
-#### 既有基底值映射问题（KNOWN_ISSUE，04C-4 未修复）
+#### 基底值映射问题（05A-1 已解决）
 
 - HTML 选项和 `STATE.houseState.base` 写入值为 `classic`、`treehouse`、`igloo`。
-- `getHouseComfortMessage()`、`buildHouseInterpretation()` 的部分判断和映射使用 `classic`、`tree`、`dome`。
-- 因此 `treehouse` / `igloo` 无法命中部分使用 `tree` / `dome` 的安慰语或解读分支。这是当前产品代码中已经存在的映射不一致；04C-4 仅作机械迁移并原样保留该行为；最终验收确认与 a0a0c50 基线一致，未借迁移修复。
+- 04C-4 机械拆分时，`getHouseComfortMessage()`、`buildHouseInterpretation()` 的部分判断和映射仍使用 `tree`、`dome`，该历史行为当时原样保留。
+- `a1d021d fix-house-base-value-mapping` 已将其统一为真实输入值 `treehouse`、`igloo`，没有修改 HTML、STATE、存储结构、SVG 或文案；05A 最终验收确认三种基底均命中正确分支。
 
 ### 04C-5：氛围小屋（atmosphere）模块拆分（已完成）
 
@@ -362,13 +375,15 @@ d9455ea  04a-css-modularization
 
 #### 跨模块依赖
 
-- `STATE.atmosphereState` — 保存背景、基底、家具、人物与 `done` 字段；当前 `soul_journey` 不序列化该模块状态。
+- `STATE.atmosphereState` — 保存背景、基底、家具、人物与 `done` 字段；自 `13406c4` 起纳入 `soul_journey`，并兼容缺字段、错误数组类型和异常记录。
 - `SoundFX.click/select/place/animBg/animBase/complete()` — 标签、素材选择、放置和完成动画的直接音效调用。
 - `toggleCollapse()` — `showAtmosphereResult()` 生成的解读折叠入口引用，当前仍在 `index.html` 公共 UI。
 - `addStickerAndBack()` — 结果页保存按钮引用，来自 `journey.js`。
 - `navigateTo()` 位于 `navigation.js`；进入 `page-atmosphere` 时由它调用 `initAtmosphere()`。
 
 **注意**：`initAtmosphere()` 被 navigation.js 的 `navigateTo()` 调用（导航到 page-atmosphere 时），也被 DOMContentLoaded 调用。迁移保留这些入口和全部静态、动态 `onclick`。8 个顶层值、21 个函数、注释与真实相对顺序均与 0eeb114 基线一致；Mouse、Touch、Wheel、Canvas、五阶段完成动画、贴纸、资源和其他模块烟雾回归均实际执行，FAIL=0、BLOCKED=0。
+
+05A 在机械拆分后的模块边界内增量修复产品行为：`initAtmosphere()` 会先清理旧动态 DOM 和交互绑定，再从纯数据状态恢复场景；完成动画生成结果时写入并保存 `done=true`，有效编辑后重置为 `false`；`cleanupAtmosphere()` 在统一导航离开氛围页时撤销临时监听器并清除动画 timer。新添加元素会在图片尺寸可用后夹取到画布内，恢复已有场景时不改写持久化坐标。
 
 ### 04C-6：此刻心意（choice）模块拆分（已完成）
 
@@ -413,7 +428,7 @@ d9455ea  04a-css-modularization
 - 创建 `js/main.js`（DOMContentLoaded 初始化逻辑）
 - 或将剩余公共函数直接保留在 index.html 内联中
 
-04D 在本地干净 `71078ef` 上实际完成登录、旅程增删改、五模块完整流程、同一旅程五类贴纸、刷新与存储、三个 XSS payload、七个视口、资源和运行时检查。产品测试 FAIL=0、BLOCKED=0。验收没有产品代码提交，也不表示已经生产发布。
+04D 在本地干净 `71078ef` 上实际完成登录、旅程增删改、五模块完整流程、同一旅程五类贴纸、刷新与存储、三个 XSS payload、七个视口、资源和运行时检查。产品测试 FAIL=0、BLOCKED=0。随后 05A 基于 `bfeffb0` 重新执行稳定性最终验收，亦为 FAIL=0、BLOCKED=0。两者都不表示已经生产发布。
 
 ---
 
@@ -443,7 +458,7 @@ d9455ea  04a-css-modularization
 
 ## 9. 关键测试规范
 
-> 本节包含机械拆分阶段形成的测试规范。04C-4、04C-5、04C-6 和 04D 的实际执行证据见 `docs/TESTING.md`；本次最终文档同步没有重新运行浏览器测试。
+> 本节包含机械拆分阶段形成的测试规范。04C-4、04C-5、04C-6、04D 和 05A 的实际执行证据见 `docs/TESTING.md`。
 
 ### XSS 防护机制
 
@@ -561,14 +576,14 @@ index.html (HTML结构 + onclick)
 04D: 本地最终整合验收 (保留当前公共内联代码，FAIL=0、BLOCKED=0)
 ```
 
-当前没有待执行的机械拆分阶段。后续工作应作为独立任务授权，可包括：已知状态与交互问题修复、真实 AI 接入前的安全和服务端架构、公共内联代码的进一步整理，或产品指标与评估体系。不得把这些建议视为已经开始。
+当前没有待执行的机械拆分或 05A 修复阶段。下一阶段如获独立授权，应先进行真实 AI 产品架构、安全、隐私和服务端边界设计；公共内联代码整理、产品指标与评估体系也须作为独立任务。不得把这些建议视为已经开始。
 
 ### 各模块实际产出
 
 | 模块 | 新文件 | 当前行数 | 函数数 | 顶层值 |
 |------|--------|----------|--------|----------|
 | 04C-4 house | js/house.js | 442 | 10 | 0 |
-| 04C-5 atmosphere | js/atmosphere.js | 963 | 21 | 8 |
+| 04C-5 atmosphere | js/atmosphere.js | 1112 | 21 个原拆分函数，另含 05A 生命周期与适配辅助函数 | 8 个原拆分顶层值，另含 05A 生命周期状态 |
 | 04C-6 choice | js/choice.js | 382 | 10 | 2 |
 
 ### 提交命名规范
@@ -578,6 +593,11 @@ index.html (HTML结构 + onclick)
 04c5-atmosphere-extraction
 04c6-choice-extraction
 docs-final-modularization-handoff
+fix-house-base-value-mapping
+fix-atmosphere-state-persistence
+fix-atmosphere-lifecycle-cleanup
+fix-atmosphere-mobile-default-placement
+docs-05a-stability-handoff
 ```
 
 ### 当前 script 加载顺序
@@ -605,7 +625,7 @@ state.js → xss.js → validation.js → storage.js → soundfx.js
 
 6. **navigation.js 中的 navigateTo() 调用了 initAtmosphere() 和 initChoicePage()**：两个函数现分别位于 `atmosphere.js` 和 `choice.js`；普通同步 script 的加载顺序保证调用可用。
 
-7. **localStorage 使用多个 key**：`soul_journey` 只保存 `archives`、`houseState`、`drawState`、`worryState`、`choiceState`；登录演示、音效和 API 设置还使用“本地存储事实”中列出的其他 key。机械拆分不得改变既有 key 或数据格式。
+7. **localStorage 使用多个 key**：`soul_journey` 保存 `archives`、`houseState`、`atmosphereState`、`drawState`、`worryState`、`choiceState`；登录演示、音效和 API 设置还使用“本地存储事实”中列出的其他 key。后续不得无独立迁移方案改变既有 key 或数据格式。
 
 8. **测试临时文件必须放在系统 TEMP 目录**，不要在项目根目录留下 baseline_*、test_*.py、qa_* 等文件。
 
@@ -615,6 +635,6 @@ state.js → xss.js → validation.js → storage.js → soundfx.js
 
 11. **登录方式需要区分**：GitHub 和 Google 按钮会跳转到各自 OAuth 授权地址，回调地址配置为腾讯云开发函数；前端收到 `code` 后仅做演示提示，不交换 token，也不会自动登录。微信入口通过 `window.postMessage({ type: 'getWxLogin' })` 发起，并监听 `wxLoginSuccess` 消息，不是 OAuth 跳转。邮箱验证码由前端随机生成、写入 `localStorage` 并直接显示在提示框中，属于演示登录，不是服务端邮件认证。该项目本身没有后端服务器或数据库。
 
-12. **当前阶段与 KNOWN_ISSUE**：04C-1～04C-6 均已完成，04D 本地最终整合验收通过。HTML/STATE 的 `treehouse`、`igloo` 与部分安慰语/解读规则的 `tree`、`dome` 不一致；`atmosphereState` 不持久化、`done` 不写入、再次进入清空家具和人物，并存在监听器与定时器清理风险。这些都是既有问题，模块化阶段未修复。
+12. **当前阶段与问题状态**：04C-1～04C-6、04D 和 05A 均已完成。基底映射、氛围状态持久化、`done`、再次进入清空元素、监听器与动画 timer 清理、320px 默认位置裁切已分别在 05A 解决并通过最终验收。当前仍未解决的是演示认证、仅本地保存且不发 AI 请求的 API Key UI，以及尚未实现真实 AI、Safety Guard、Agent、服务端 Gateway 和数据库。
 
-13. **专题文档**：产品演进见 `docs/PRODUCT_EVOLUTION.md`，04C-4～04D 实际验收证据见 `docs/TESTING.md`，提交级变更见 `CHANGELOG.md`。这些文件仅记录已确认事实与规划边界。
+13. **专题文档**：产品演进见 `docs/PRODUCT_EVOLUTION.md`，04C-4～05A 实际验收证据见 `docs/TESTING.md`，提交级变更见 `CHANGELOG.md`。这些文件仅记录已确认事实与规划边界。
