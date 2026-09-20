@@ -1,3 +1,5 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
+
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 const MODEL = 'gpt-4.1-mini';
 const MAX_MESSAGE_LENGTH = 2000;
@@ -25,6 +27,12 @@ function jsonResponse(body, status, requestId, extraHeaders = {}) {
 
 function errorResponse(error, status, requestId, extraHeaders) {
   return jsonResponse({ ok: false, error }, status, requestId, extraHeaders);
+}
+
+function safeTokenEqual(providedToken, expectedToken) {
+  const providedHash = createHash('sha256').update(providedToken, 'utf8').digest();
+  const expectedHash = createHash('sha256').update(expectedToken, 'utf8').digest();
+  return timingSafeEqual(providedHash, expectedHash);
 }
 
 function extractReply(data) {
@@ -55,6 +63,20 @@ export default {
       });
     }
 
+    const apiKey = process.env.OPENAI_API_KEY;
+    const testToken = process.env.AI_GATEWAY_TEST_TOKEN;
+    if (!apiKey || !testToken) {
+      return errorResponse('service_unavailable', 503, requestId);
+    }
+
+    const authorization = request.headers.get('Authorization') || '';
+    const providedToken = authorization.startsWith('Bearer ')
+      ? authorization.slice('Bearer '.length)
+      : '';
+    if (!providedToken || !safeTokenEqual(providedToken, testToken)) {
+      return errorResponse('unauthorized', 401, requestId);
+    }
+
     let body;
     try {
       body = await request.json();
@@ -69,11 +91,6 @@ export default {
     const message = body.message.trim();
     if (message.length > MAX_MESSAGE_LENGTH) {
       return errorResponse('message_too_long', 400, requestId);
-    }
-
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return errorResponse('service_unavailable', 503, requestId);
     }
 
     const controller = new AbortController();
