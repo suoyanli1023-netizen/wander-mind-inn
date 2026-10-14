@@ -1,11 +1,11 @@
-const cloudbase = require('@cloudbase/node-sdk');
+const http = require('node:http');
 const { createHmac, randomUUID } = require('node:crypto');
 
 const ARK_CHAT_COMPLETIONS_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_OUTPUT_TOKENS = 220;
 const REQUEST_TIMEOUT_MS = 12000;
-const USAGE_COLLECTION = 'ai_gateway_usage';
+const MAX_REQUEST_BODY_BYTES = 16384;
 
 const SYSTEM_PROMPT = `你是“心绪漫游小栈”的温和陪伴助手。回复要温和、简短、具体，不说教。
 不要虚构用户信息；信息不足时要明确说明，并可提出一个简短的澄清问题。
@@ -45,10 +45,28 @@ function errorResponse(error, statusCode, requestId, headers) {
 }
 
 function normalizeHeaders(headers = {}) {
-  return Object.entries(headers).reduce((result, [name, value]) => {
+  return Object.entries(headers || {}).reduce((result, [name, value]) => {
     result[name.toLowerCase()] = Array.isArray(value) ? value.join(',') : String(value);
     return result;
   }, {});
+}
+
+function extractGatewayUid(authorization, currentDate) {
+  if (!authorization.startsWith('Bearer ')) return '';
+  const token = authorization.slice('Bearer '.length).trim();
+  const parts = token.split('.');
+  if (parts.length !== 3) return '';
+
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    const uid = payload.user_id || payload.sub;
+    const expiresAt = Number(payload.exp) * 1000;
+    if (typeof uid !== 'string' || !uid || uid.length > 256) return '';
+    if (!Number.isFinite(expiresAt) || expiresAt <= currentDate.getTime()) return '';
+    return uid;
+  } catch {
+    return '';
+  }
 }
 
 function parseAllowedOrigins(value) {
@@ -105,51 +123,67 @@ function anonymizeUserId(uid, secret) {
   return createHmac('sha256', secret).update(uid, 'utf8').digest('hex');
 }
 
-function documentData(result) {
-  if (!result || !result.data) return null;
-  return Array.isArray(result.data) ? result.data[0] || null : result.data;
+function createMemoryUsageStore() {
+  let activeDate = '';
+  let globalAttempts = 0;
+  const userAttempts = new Map();
+
+  return {
+    reserve(uid, config, currentDate) {
+      const dateKey = shanghaiDateKey(currentDate);
+      if (dateKey !== activeDate) {
+        activeDate = dateKey;
+        globalAttempts = 0;
+        userAttempts.clear();
+      }
+
+      const userHash = anonymizeUserId(uid, config.hashSecret);
+      const currentUserAttempts = userAttempts.get(userHash) || 0;
+      if (globalAttempts >= config.globalLimit) return { allowed: false, reason: 'global' };
+      if (currentUserAttempts >= config.userLimit) return { allowed: false, reason: 'user' };
+
+      globalAttempts += 1;
+      userAttempts.set(userHash, currentUserAttempts + 1);
+      return { allowed: true };
+    }
+  };
 }
 
-async function reserveDailyUsage(database, uid, config, now) {
-  const dateKey = shanghaiDateKey(now);
-  const userHash = anonymizeUserId(uid, config.hashSecret);
-  const globalId = `global_${dateKey}`;
-  const userId = `user_${userHash}_${dateKey}`;
+const defaultUsageStore = createMemoryUsageStore();
 
-  return database.runTransaction(async transaction => {
-    const collection = transaction.collection(USAGE_COLLECTION);
-    const [globalResult, userResult] = await Promise.all([
-      collection.doc(globalId).get(),
-      collection.doc(userId).get()
-    ]);
-    const globalAttempts = Number(documentData(globalResult)?.attempts || 0);
-    const userAttempts = Number(documentData(userResult)?.attempts || 0);
-
-    if (globalAttempts >= config.globalLimit) return { allowed: false, reason: 'global' };
-    if (userAttempts >= config.userLimit) return { allowed: false, reason: 'user' };
-
-    const updatedAt = now.toISOString();
-    await collection.doc(globalId).set({
-      data: { scope: 'global', date: dateKey, attempts: globalAttempts + 1, updatedAt }
-    });
-    await collection.doc(userId).set({
-      data: { scope: 'user', date: dateKey, attempts: userAttempts + 1, updatedAt }
-    });
-    return { allowed: true };
-  });
-}
-
-function createHandler({ app, fetchImpl = fetch, now = () => new Date(), env = process.env }) {
+function createHandler({
+  fetchImpl = fetch,
+  now = () => new Date(),
+  env = process.env,
+  usageStore = defaultUsageStore
+}) {
   return async function handler(event = {}) {
     const requestId = randomUUID();
     const method = String(event.httpMethod || event.requestContext?.httpMethod || '').toUpperCase();
+    const path = String(event.path || '/').split('?')[0];
     const headers = normalizeHeaders(event.headers);
     const origin = headers.origin || '';
     const allowedOrigins = parseAllowedOrigins(env.AI_ALLOWED_ORIGINS);
     const cors = corsHeaders(origin, allowedOrigins);
 
+    if (method === 'GET' && path === '/health') {
+      return response({
+        ok: true,
+        service: 'wander-mind-ai-gateway',
+        version: 'cloudbase-run-v1'
+      }, 200, requestId);
+    }
+
+    if (allowedOrigins.size === 0) {
+      return errorResponse('service_unavailable', 503, requestId);
+    }
+
     if (origin && !allowedOrigins.has(origin)) {
       return errorResponse('origin_not_allowed', 403, requestId);
+    }
+
+    if (path !== '/api/chat') {
+      return errorResponse('not_found', 404, requestId, cors);
     }
 
     if (method === 'OPTIONS') {
@@ -163,12 +197,7 @@ function createHandler({ app, fetchImpl = fetch, now = () => new Date(), env = p
       });
     }
 
-    let uid = '';
-    try {
-      uid = app.auth().getUserInfo().uid || '';
-    } catch {
-      uid = '';
-    }
+    const uid = extractGatewayUid(headers.authorization || '', now());
     if (!uid) {
       return errorResponse('unauthorized', 401, requestId, cors);
     }
@@ -201,16 +230,12 @@ function createHandler({ app, fetchImpl = fetch, now = () => new Date(), env = p
       globalLimit: parsePositiveInteger(env.AI_DAILY_GLOBAL_LIMIT)
     };
     if (!config.apiKey || !config.model || !config.hashSecret
-      || !config.userLimit || !config.globalLimit || allowedOrigins.size === 0) {
+      || !config.userLimit || !config.globalLimit) {
+      console.error(JSON.stringify({ event: 'gateway_configuration_invalid', requestId }));
       return errorResponse('service_unavailable', 503, requestId, cors);
     }
 
-    let reservation;
-    try {
-      reservation = await reserveDailyUsage(app.database(), uid, config, now());
-    } catch {
-      return errorResponse('service_unavailable', 503, requestId, cors);
-    }
+    const reservation = usageStore.reserve(uid, config, now());
     if (!reservation.allowed) {
       return reservation.reason === 'user'
         ? errorResponse('rate_limited', 429, requestId, cors)
@@ -268,13 +293,82 @@ function createHandler({ app, fetchImpl = fetch, now = () => new Date(), env = p
   };
 }
 
-const app = cloudbase.init({ env: cloudbase.SYMBOL_CURRENT_ENV });
-exports.main = createHandler({ app });
+function readNodeBody(request) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    let tooLarge = false;
+
+    request.on('data', chunk => {
+      size += chunk.length;
+      if (size > MAX_REQUEST_BODY_BYTES) {
+        tooLarge = true;
+        return;
+      }
+      chunks.push(chunk);
+    });
+    request.on('end', () => {
+      if (tooLarge) {
+        reject(new Error('body_too_large'));
+        return;
+      }
+      resolve(Buffer.concat(chunks).toString('utf8'));
+    });
+    request.on('error', reject);
+  });
+}
+
+function createNodeServer({
+  fetchImpl = fetch,
+  now = () => new Date(),
+  env = process.env,
+  usageStore = defaultUsageStore
+}) {
+  const handler = createHandler({ fetchImpl, now, env, usageStore });
+
+  return http.createServer(async (request, nodeResponse) => {
+    let result;
+    try {
+      const body = await readNodeBody(request);
+      result = await handler({
+        httpMethod: request.method,
+        path: request.url,
+        headers: request.headers,
+        body,
+        isBase64Encoded: false
+      });
+    } catch {
+      const headers = normalizeHeaders(request.headers);
+      const allowedOrigins = parseAllowedOrigins(env.AI_ALLOWED_ORIGINS);
+      result = errorResponse(
+        'invalid_message',
+        400,
+        randomUUID(),
+        corsHeaders(headers.origin || '', allowedOrigins)
+      );
+    }
+
+    nodeResponse.writeHead(result.statusCode, result.headers);
+    nodeResponse.end(result.body);
+  });
+}
+
+function startServer(env = process.env) {
+  const server = createNodeServer({ env });
+  const port = parsePositiveInteger(env.PORT) || 3000;
+  server.listen(port, '0.0.0.0');
+  return server;
+}
+
+if (require.main === module) startServer();
+
 exports.__test = {
   createHandler,
-  reserveDailyUsage,
+  createNodeServer,
+  createMemoryUsageStore,
   shanghaiDateKey,
   anonymizeUserId,
+  extractGatewayUid,
   CRISIS_REPLY,
   SAFE_FALLBACK_REPLY,
   SYSTEM_PROMPT,

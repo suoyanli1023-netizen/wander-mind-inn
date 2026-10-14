@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
   "engines": {
     "node": ">=20"
-  },
-  "dependencies": {
-    "@cloudbase/node-sdk": "3.18.3"
   }
 }
