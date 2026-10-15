@@ -143,3 +143,54 @@
   color: var(--text);
 }
 
+.login-welcome-card {
+  padding: 22px;
+  border-radius: var(--radius);
+  background: rgba(255, 249, 245, 0.9);
+  box-shadow: var(--card-shadow);
+}
+.login-welcome-card > p {
+  color: var(--text-light);
+  font-size: 14px;
+  line-height: 1.7;
+  text-align: center;
+}
+.login-consent-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 18px;
+  color: var(--text-light);
+  font-size: 12px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+.login-consent-row input {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  flex-shrink: 0;
+  accent-color: var(--primary-dark);
+}
+.login-start-btn {
+  width: 100%;
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--primary), #b6c9bf);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  transition: all 0.25s ease;
+}
+.login-start-btn:not(:disabled):hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+.login-start-btn:disabled { cursor: not-allowed; opacity: 0.45; }
+.login-public-status {
+  min-height: 20px;
+  margin-top: 8px;
+  color: #9b625d;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+

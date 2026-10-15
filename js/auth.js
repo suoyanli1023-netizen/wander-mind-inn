@@ -14,6 +14,8 @@ const GITHUB_CLIENT_ID = 'Ov23li0bhQP8YSQk41x4';
 // Google OAuth Client ID
 const GOOGLE_CLIENT_ID = '1068484025478-63u3eur7k33llrqrv33len1657p6vcl0.apps.googleusercontent.com';
 
+const PUBLIC_EXPERIENCE_CONSENT_KEY = 'public_experience_consent_v1';
+
 // ---- 登录成功统一处理 ----
 function handleLoginSuccess(provider, userId, nickname) {
   localStorage.setItem('login_user_id', userId);
@@ -31,7 +33,8 @@ function handleLoginSuccess(provider, userId, nickname) {
 function checkLoginStatus() {
   const userId = localStorage.getItem('login_user_id');
   const nickname = localStorage.getItem('login_nickname');
-  if (userId && nickname) {
+  const hasConsent = localStorage.getItem(PUBLIC_EXPERIENCE_CONSENT_KEY) === 'accepted';
+  if (userId && nickname && hasConsent) {
     // 已登录，直接跳主页
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById('page-home').classList.add('active');
@@ -50,6 +53,21 @@ function logout() {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-login').classList.add('active');
   STATE.currentPage = 'page-login';
+}
+
+// ---- 公开体验入口 ----
+function enterPublicExperience() {
+  const consent = document.getElementById('publicConsentCheck');
+  const status = document.getElementById('loginPublicStatus');
+  if (!consent || !consent.checked) {
+    if (status) status.textContent = '请先阅读并确认上面的体验说明。';
+    return;
+  }
+
+  localStorage.setItem(PUBLIC_EXPERIENCE_CONSENT_KEY, 'accepted');
+  const existingId = localStorage.getItem('login_user_id');
+  handleLoginSuccess('anonymous', existingId || 'public_guest', '体验访客');
+  if (typeof prewarmAiSession === 'function') prewarmAiSession();
 }
 
 // ---- OAuth 回调处理（URL 中带 code 参数时执行）----
@@ -86,7 +104,7 @@ function handleOAuthCallback() {
   if (loginPage) {
     const notice = document.createElement('div');
     notice.style.cssText = 'margin-top:12px;padding:10px 16px;background:#fff3cd;border-radius:8px;font-size:13px;color:#856404;text-align:center;';
-    notice.textContent = '已收到 ' + state + ' 授权回调，但正式认证服务尚未接入。请使用「调试：模拟登录」进入。';
+    notice.textContent = '当前公开体验无需第三方登录，请阅读体验说明后直接进入。';
     const container = loginPage.querySelector('.login-container');
     if (container) container.appendChild(notice);
   }
@@ -169,6 +187,8 @@ function initLoginPage() {
   const sendCodeBtn = document.getElementById('sendCodeBtn');
   const emailLoginBtn = document.getElementById('emailLoginBtn');
   const debugBtn = document.getElementById('debugLoginBtn');
+  const consent = document.getElementById('publicConsentCheck');
+  const startBtn = document.getElementById('startExperienceBtn');
 
   if (wechatBtn) wechatBtn.onclick = triggerWxLogin;
 
@@ -208,4 +228,18 @@ function initLoginPage() {
     // 调试模式：模拟登录直接进入
     handleLoginSuccess('debug', 'debug_user_' + Date.now(), '体验用户');
   };
+
+  if (consent && startBtn) {
+    consent.checked = localStorage.getItem(PUBLIC_EXPERIENCE_CONSENT_KEY) === 'accepted';
+    startBtn.disabled = !consent.checked;
+    consent.addEventListener('change', function() {
+      startBtn.disabled = !consent.checked;
+      const status = document.getElementById('loginPublicStatus');
+      if (status) status.textContent = '';
+    });
+    startBtn.addEventListener('click', function() {
+      SoundFX.click();
+      enterPublicExperience();
+    });
+  }
 }

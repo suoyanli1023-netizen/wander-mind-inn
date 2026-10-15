@@ -1,0 +1,218 @@
+/* ========== AI 陪伴入口 ========== */
+.ai-entry {
+  max-width: 600px;
+  margin: 10px auto 0;
+  padding: 20px;
+  border: 1px solid rgba(196, 168, 160, 0.28);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(252, 232, 234, 0.78), rgba(232, 244, 238, 0.86));
+  box-shadow: var(--card-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.ai-entry-copy { min-width: 0; }
+.ai-entry-badge {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--primary-dark);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.ai-entry h2 {
+  margin-top: 8px;
+  color: var(--text);
+  font-size: 18px;
+}
+.ai-entry p {
+  margin-top: 6px;
+  color: var(--text-light);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.ai-entry-button {
+  flex-shrink: 0;
+  padding: 11px 18px;
+  border-radius: 22px;
+  background: var(--card);
+  color: var(--text);
+  box-shadow: var(--card-shadow);
+  font-size: 13px;
+  font-weight: 600;
+  transition: var(--transition);
+}
+.ai-entry-button:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+
+/* ========== AI 陪伴对话框 ========== */
+.ai-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: none;
+  background: rgba(64, 52, 48, 0.24);
+  backdrop-filter: blur(6px);
+}
+.ai-overlay.show { display: block; }
+.ai-dialog {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 2101;
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 32px));
+  padding: 20px;
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: 0 24px 80px rgba(90, 74, 68, 0.2);
+  transform: translate(-50%, -46%) scale(0.98);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.24s ease, transform 0.24s ease, visibility 0s linear 0.24s;
+  display: flex;
+  flex-direction: column;
+}
+.ai-dialog.show {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+body.ai-dialog-open { overflow: hidden; }
+.ai-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.ai-dialog-header h3 {
+  margin-top: 7px;
+  color: var(--text);
+  font-size: 19px;
+}
+.ai-dialog-close {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text-light);
+  font-size: 16px;
+}
+.ai-messages {
+  min-height: 190px;
+  max-height: 330px;
+  overflow-y: auto;
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ai-message {
+  max-width: 88%;
+  padding: 10px 13px;
+  border-radius: 15px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ai-message-assistant {
+  align-self: flex-start;
+  background: var(--card);
+  border-bottom-left-radius: 5px;
+}
+.ai-message-user {
+  align-self: flex-end;
+  background: var(--accent-light);
+  border-bottom-right-radius: 5px;
+}
+.ai-status {
+  min-height: 22px;
+  padding: 5px 2px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ai-status.loading { color: var(--text-light); }
+.ai-status.error { color: #9b625d; }
+.ai-compose {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--primary-light);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+.ai-compose textarea {
+  width: 100%;
+  border: 0;
+  resize: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.ai-compose textarea:disabled { opacity: 0.65; }
+.ai-compose-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+}
+#ai-char-count { color: var(--text-muted); font-size: 11px; }
+#ai-send-button {
+  padding: 8px 18px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--primary-light), var(--accent-light));
+  color: var(--text);
+  font-weight: 600;
+}
+#ai-send-button:disabled { cursor: wait; opacity: 0.55; }
+.ai-disclaimer {
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 620px) {
+  .ai-entry {
+    margin-left: 16px;
+    margin-right: 16px;
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .ai-entry-button { width: 100%; }
+  .ai-dialog {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 20px 20px 0 0;
+    transform: translateY(24px);
+  }
+  .ai-dialog.show { transform: translateY(0); }
+  .ai-messages { min-height: 170px; max-height: 36vh; }
+}

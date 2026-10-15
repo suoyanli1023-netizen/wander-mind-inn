@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="css/global.css">
 <link rel="stylesheet" href="css/login.css">
 <link rel="stylesheet" href="css/home.css">
+<link rel="stylesheet" href="css/ai.css">
 <link rel="stylesheet" href="css/common-components.css">
 <link rel="stylesheet" href="css/house.css">
 <link rel="stylesheet" href="css/atmosphere.css">
@@ -49,45 +50,15 @@
         <div class="login-subtitle">在这里，温柔地陪伴每一次情绪</div>
       </div>
 
-      <!-- 国内登录区 -->
-      <div class="login-section-label">国内登录</div>
-      <button class="login-btn login-btn-wechat" id="wechatLogin">
-        <span style="font-size:20px;">💚</span> 微信小程序一键登入
-      </button>
-
-      <!-- 邮箱登录区 -->
-      <div class="login-divider">
-        <div class="login-divider-line"></div>
-        <div class="login-divider-text">邮箱登录</div>
-        <div class="login-divider-line"></div>
+      <div class="login-welcome-card">
+        <p>无需注册。你的旅程记录保存在当前浏览器中，可以先从任意一个小模块开始。</p>
+        <label class="login-consent-row">
+          <input type="checkbox" id="publicConsentCheck">
+          <span>我已了解：发送给 AI 陪伴的文字会传至服务端与模型生成即时回复；该功能不提供医疗诊断或紧急救援。</span>
+        </label>
+        <button class="login-start-btn" id="startExperienceBtn" disabled>开始体验</button>
+        <div class="login-public-status" id="loginPublicStatus" aria-live="polite"></div>
       </div>
-      <select class="login-email-input" id="emailDomain">
-        <option value="@qq.com">QQ 邮箱 (@qq.com)</option>
-        <option value="@163.com">163 邮箱 (@163.com)</option>
-      </select>
-      <div class="login-email-row">
-        <input type="text" class="login-email-input" id="emailUser" placeholder="输入邮箱账号" maxlength="64">
-        <button class="login-code-btn" id="sendCodeBtn">获取验证码</button>
-      </div>
-      <input type="text" class="login-email-input" id="emailCode" placeholder="输入验证码" maxlength="6">
-      <button class="login-email-submit" id="emailLoginBtn">邮箱验证码登入</button>
-
-      <!-- 海外登录区 -->
-      <div class="login-overseas">
-        <div class="login-section-label">其他登录方式</div>
-        <button class="login-btn login-btn-github" id="githubLogin">
-          <span style="font-size:20px;">🐙</span> GitHub 登录
-        </button>
-        <button class="login-btn login-btn-google" id="googleLogin">
-          <span style="font-size:20px;">🔍</span> Google 登录
-        </button>
-        <div style="margin-top:4px;font-size:11px;color:var(--text-muted);text-align:center;line-height:1.4;">
-          演示功能，暂未接入正式认证<br>授权回调后需使用调试按钮进入
-        </div>
-      </div>
-
-      <!-- 调试按钮 -->
-      <button class="login-debug-btn" id="debugLoginBtn">🧪 调试：模拟登录直接进入</button>
     </div>
   </div>
 </div>
@@ -222,6 +193,15 @@
       </div>
     </div>
   </div>
+
+  <section class="ai-entry" aria-labelledby="ai-entry-title">
+    <div class="ai-entry-copy">
+      <span class="ai-entry-badge">AI 陪伴 · 体验版</span>
+      <h2 id="ai-entry-title">想先说说此刻的心情吗？</h2>
+      <p>获得简短、温和且不诊断的回应。AI 暂时不可用时，其他情绪模块仍可正常使用。</p>
+    </div>
+    <button class="ai-entry-button" type="button" onclick="openAiCompanion()">和小栈聊一会儿</button>
+  </section>
 
   <div class="module-grid">
     <div class="module-card" onclick="navigateTo('page-house-select')">
@@ -721,6 +701,31 @@
 </div>
 
 <!-- ============================================================ -->
+<!-- AI 陪伴面板 -->
+<!-- ============================================================ -->
+<div class="ai-overlay" id="ai-overlay" onclick="closeAiCompanion()"></div>
+<section class="ai-dialog" id="ai-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-dialog-title">
+  <div class="ai-dialog-header">
+    <div>
+      <span class="ai-entry-badge">AI 陪伴 · 体验版</span>
+      <h3 id="ai-dialog-title">说说此刻的感受</h3>
+    </div>
+    <button class="ai-dialog-close" type="button" onclick="closeAiCompanion()" aria-label="关闭 AI 陪伴">✕</button>
+  </div>
+  <div class="ai-messages" id="ai-messages" aria-live="polite"></div>
+  <div class="ai-status" id="ai-status" aria-live="polite"></div>
+  <div class="ai-compose">
+    <label class="sr-only" for="ai-message-input">想对小栈说的话</label>
+    <textarea id="ai-message-input" maxlength="2000" rows="3" placeholder="例如：我今天有一点紧张……"></textarea>
+    <div class="ai-compose-footer">
+      <span id="ai-char-count">0 / 2000</span>
+      <button id="ai-send-button" type="button" onclick="sendAiMessage()">发送</button>
+    </div>
+  </div>
+  <p class="ai-disclaimer">AI 回复仅用于一般性情绪陪伴，不构成心理或医学诊断，也不能替代专业帮助或紧急救援。</p>
+</section>
+
+<!-- ============================================================ -->
 <!-- 设置面板 -->
 <!-- ============================================================ -->
 <div class="settings-overlay" id="settings-overlay" onclick="toggleSettings()"></div>
@@ -729,14 +734,6 @@
     ⚙️ 设置
     <span class="settings-close" onclick="toggleSettings()">✕</span>
   </h3>
-  <div class="settings-field">
-    <label>OpenAI API 密钥</label>
-    <input type="password" id="api-key-input" placeholder="sk-..." onchange="saveApiKey()">
-  </div>
-  <div class="settings-field">
-    <label>API 地址（可选）</label>
-    <input type="text" id="api-url-input" placeholder="https://api.openai.com/v1" onchange="saveApiUrl()">
-  </div>
   <div class="settings-field">
     <label>🔊 音效</label>
     <div style="display:flex;align-items:center;gap:10px;">
@@ -751,9 +748,7 @@
     <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">柔和的音效会在互动时轻轻响起</div>
   </div>
   <div class="settings-note">
-    💡 API 密钥仅存储在本地浏览器中，不会上传到任何服务器。<br><br>
-    系统提示词已内置：<br>
-    <em>"你是一个温柔共情的陪伴者。请用温暖、理解的语言回应用户的情绪表达。全程禁止说教、心理咨询式诊断、强行开导或给出建议。只需反映、共情、陪伴。用简洁的中文回复。"</em>
+    🔒 旅程记录保存在当前浏览器中。只有你主动发送给 AI 陪伴的文字会传至服务端与模型，用于生成当次回复；小栈不会要求你填写模型 API Key。
   </div>
 </div>
 
@@ -789,6 +784,7 @@
 <script src="js/soundfx.js"></script>
 <script src="js/navigation.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/ai.js"></script>
 <script src="js/journey.js"></script>
 <script src="js/worry.js"></script>
 <script src="js/draw.js"></script>
@@ -812,6 +808,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!handleOAuthCallback() && !checkLoginStatus()) {
     STATE.currentPage = 'page-login';
   }
+  initAiCompanion();
 
   loadFromStorage();
   renderArchive();
@@ -938,22 +935,8 @@ function toggleSettings() {
   panel.classList.toggle('show');
   overlay.classList.toggle('show');
   if (!isOpen) {
-    document.getElementById('api-key-input').value = localStorage.getItem('api_key') || '';
-    document.getElementById('api-url-input').value = localStorage.getItem('api_url') || 'https://api.openai.com/v1';
     updateSoundToggleUI();
   }
-}
-
-function saveApiKey() {
-  const val = document.getElementById('api-key-input').value.trim();
-  if (val) localStorage.setItem('api_key', val);
-  else localStorage.removeItem('api_key');
-}
-
-function saveApiUrl() {
-  const val = document.getElementById('api-url-input').value.trim();
-  if (val) localStorage.setItem('api_url', val);
-  else localStorage.removeItem('api_url');
 }
 
 function detectMoodTags() {
@@ -986,8 +969,12 @@ function toggleCollapse(id) {
 
 <!-- ====== 极简音频解锁：首次触摸/点击播放任意静音 audio 标签，解锁移动端音频播放 ====== -->
 <script>
-document.body.addEventListener('touchstart',function(){document.getElementById('sfx-click').play();},{once:true});
-document.body.addEventListener('click',function(){document.getElementById('sfx-click').play();},{once:true});
+function unlockFirstAudio() {
+  const playAttempt = document.getElementById('sfx-click').play();
+  if (playAttempt && typeof playAttempt.catch === 'function') playAttempt.catch(() => {});
+}
+document.body.addEventListener('touchstart', unlockFirstAudio, { once: true });
+document.body.addEventListener('click', unlockFirstAudio, { once: true });
 </script>
 
 </body>

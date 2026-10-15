@@ -2,9 +2,12 @@ const http = require('node:http');
 const { createHmac, randomUUID } = require('node:crypto');
 
 const ARK_CHAT_COMPLETIONS_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+const CLOUDBASE_ENV_ID = 'cloudbase-d4gvblu5z203a2fd7';
+const CLOUDBASE_TOKEN_INTROSPECTION_URL = `https://${CLOUDBASE_ENV_ID}.api.tcloudbasegateway.com/auth/v1/token/introspect`;
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_OUTPUT_TOKENS = 220;
 const REQUEST_TIMEOUT_MS = 12000;
+const TOKEN_INTROSPECTION_TIMEOUT_MS = 5000;
 const MAX_REQUEST_BODY_BYTES = 16384;
 
 const SYSTEM_PROMPT = `你是“心绪漫游小栈”的温和陪伴助手。回复要温和、简短、具体，不说教。
@@ -51,21 +54,41 @@ function normalizeHeaders(headers = {}) {
   }, {});
 }
 
-function extractGatewayUid(authorization, currentDate) {
-  if (!authorization.startsWith('Bearer ')) return '';
-  const token = authorization.slice('Bearer '.length).trim();
-  const parts = token.split('.');
-  if (parts.length !== 3) return '';
+async function introspectAccessToken(authorization, fetchImpl) {
+  if (!authorization.startsWith('Bearer ') || authorization.length > 8192) {
+    return { uid: '', unavailable: false };
+  }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TOKEN_INTROSPECTION_TIMEOUT_MS);
   try {
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-    const uid = payload.user_id || payload.sub;
-    const expiresAt = Number(payload.exp) * 1000;
-    if (typeof uid !== 'string' || !uid || uid.length > 256) return '';
-    if (!Number.isFinite(expiresAt) || expiresAt <= currentDate.getTime()) return '';
-    return uid;
+    const result = await fetchImpl(CLOUDBASE_TOKEN_INTROSPECTION_URL, {
+      method: 'GET',
+      headers: {
+        Authorization: authorization,
+        Accept: 'application/json'
+      },
+      cache: 'no-store',
+      signal: controller.signal
+    });
+    if (!result.ok) return { uid: '', unavailable: true };
+
+    let data;
+    try {
+      data = await result.json();
+    } catch {
+      return { uid: '', unavailable: true };
+    }
+
+    const uid = data && data.sub;
+    if (typeof uid !== 'string' || !uid || uid.length > 256) {
+      return { uid: '', unavailable: false };
+    }
+    return { uid, unavailable: false };
   } catch {
-    return '';
+    return { uid: '', unavailable: true };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -197,8 +220,11 @@ function createHandler({
       });
     }
 
-    const uid = extractGatewayUid(headers.authorization || '', now());
-    if (!uid) {
+    const authResult = await introspectAccessToken(headers.authorization || '', fetchImpl);
+    if (authResult.unavailable) {
+      return errorResponse('service_unavailable', 503, requestId, cors);
+    }
+    if (!authResult.uid) {
       return errorResponse('unauthorized', 401, requestId, cors);
     }
 
@@ -235,7 +261,7 @@ function createHandler({
       return errorResponse('service_unavailable', 503, requestId, cors);
     }
 
-    const reservation = usageStore.reserve(uid, config, now());
+    const reservation = usageStore.reserve(authResult.uid, config, now());
     if (!reservation.allowed) {
       return reservation.reason === 'user'
         ? errorResponse('rate_limited', 429, requestId, cors)
@@ -368,7 +394,7 @@ exports.__test = {
   createMemoryUsageStore,
   shanghaiDateKey,
   anonymizeUserId,
-  extractGatewayUid,
+  introspectAccessToken,
   CRISIS_REPLY,
   SAFE_FALLBACK_REPLY,
   SYSTEM_PROMPT,
